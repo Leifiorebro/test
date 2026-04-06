@@ -1,0 +1,1469 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Fotosida — Galleri</title>
+<style>
+  :root{
+    --bg: #F1C716;
+    --header: #1f4ea3;
+    --card-w: 260px;
+  }
+  html,body{ height:100%; margin:0; background:var(--bg); font-family:Inter, Arial, sans-serif; color:#111; }
+  header.appbar{
+    background:var(--header); color:white; padding:12px 16px; display:flex; gap:8px; align-items:center; justify-content:space-between;
+  }
+  .app-left{ display:flex; gap:8px; align-items:center; }
+  .app-right{ display:flex; gap:8px; align-items:center; }
+  button, .btn {
+    padding:8px 12px; border-radius:8px; border: none; cursor:pointer;
+    background:rgba(255,255,255,0.08); color:white;
+  }
+  button.ghost { background:transparent; border:1px solid rgba(255,255,255,0.06); color:white; }
+  main.container { max-width:1200px; margin:18px auto; padding:12px; }
+  .toolbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+  .search { flex:1; min-width:200px; display:flex; gap:8px; align-items:center; }
+  .search input { width:100%; padding:8px 10px; border-radius:8px; border:1px solid #ddd; }
+  
+  /* ===== GALLERI ===== */
+
+
+#gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+  
+/* ===== KORT ===== */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: clamp(300px, 45vh, 360px);
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.img-wrap {
+  position: relative;
+  height: 200px;
+  background: #eee;
+  overflow: hidden;
+}
+
+/* Bilden */
+.img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Knappar dolda som standard */
+.img-wrap .editBtn,
+.img-wrap .delBtn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+/* Visa knappar endast vid hover */
+.img-wrap:hover .editBtn,
+.img-wrap:hover .delBtn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ===== BILD ===== */
+/*.card img {
+  width: 100%;
+  height: 420px;
+  object-fit: contain;   /* 🔑 hela bilden syns*/
+  background: #f5f5f5;
+  display: block;
+}*/
+
+.card img {
+  width: 100%;
+  height: 170px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+  
+
+.caption {
+  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.3em;
+  text-align: center;        /* ✅ centrera text */
+  align-self: center;        /* ✅ centrera inom kortet */
+  width: 100%;   
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  white-space: pre-line;   /* 🔑 visar radbrytningar */
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.caption:only-child,
+.caption:not(:has(br)) {
+  font-weight: 500;
+}
+
+
+
+.editBtn,
+.delBtn {
+  position: absolute;
+  top: 6px;
+  background: rgba(255,255,255,0.85);
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  z-index: 2;
+}
+
+.editBtn { right: 36px; }
+.delBtn  { right: 6px;  }
+
+ .delBtn:hover {
+  background: #ffd6d6;
+   
+}
+
+
+.editBtn:hover {
+  background: #e6f0ff;
+}
+
+
+  .thumb {
+    width:100%;
+    height:180px;
+    background:white;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:8px; overflow:hidden; border:1px solid #eee;
+  }
+  .thumb img { width:100%; height:100%; object-fit:contain; background:white; display:block; }
+  .meta { text-align:center; font-size:14px; color:#333; }
+  .actions { display:flex; gap:6px; margin-top:6px; }
+  .actions .btn { background:var(--header); color:white; }
+  /* Sidepanel */
+  .sidepanel {
+    position:fixed; right:-420px; top:0; width:400px; height:100%; background:#fff; box-shadow:-6px 0 30px rgba(0,0,0,0.15);
+    padding:14px; transition:right .26s ease; z-index:2200; overflow:auto;
+  }
+  .sidepanel.open { right:0; }
+  .sidepanel h3 { margin:0 0 8px 0; display:inline-block; }
+  .input, textarea { width:100%; padding:8px; border-radius:8px; border:1px solid #ddd; margin-bottom:10px; box-sizing:border-box; font-size:14px; }
+  .modal {
+    position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.8); z-index:3000;
+  }
+  .modal.show { display:flex; }
+  .modal img { max-width:94vw; max-height:92vh; border-radius:6px; background:white; object-fit:contain; }
+  .modal .closebtn { position:absolute; top:18px; left:18px; padding:10px 14px; border-radius:8px; background:blue; border:none; cursor:pointer; color:white; }
+  footer { text-align:center; padding:20px 0; color:#333; opacity:0.9; }
+  /* Sort modal */
+  #sortModal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); z-index:3200; }
+  #sortModal .panel { width:90%; max-width:720px; max-height:80vh; background:white; border-radius:10px; padding:12px; overflow:auto; position:relative; }
+  .sort-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+  .sort-item { display:flex; gap:12px; align-items:center; padding:8px; border-radius:8px; border:1px solid #eee; cursor:grab; background:#fafafa; }
+  .sort-item.dragging { opacity:0.5; }
+  .sort-item img { width:72px; height:54px; object-fit:contain; background:white; border-radius:4px; border:1px solid #ddd; }
+  /* close button for sort modal */
+  #sortModal .closeSortBtn {
+    position:absolute; right:12px; top:12px; background:blue; border:none; font-size:18px; cursor:pointer; padding:6px; border-radius:6px;
+    color:white;
+  }
+  #sortModal .closeSortBtn:hover { opacity:0.9; }/*#f2f2f2*/
+  @media (max-width:900px){
+    .sidepanel{ width:100%; }
+    .card { max-width:100%; }
+  }
+  
+ 
+
+.modal-content {
+  max-width: 92vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+#modalImg {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+#bigCaption {
+  color: white;
+  font-size: 14px;
+  max-width: 90vw;
+  text-align: center;
+  line-height: 1.4;
+}
+  
+  
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <div class="app-left">
+    <strong style="font-size:18px">Fotosida</strong>
+  </div>
+
+  <div class="app-right">
+    <button id="openPanelTop" class="ghost">☰ Lägg till foto</button>
+    <button id="newPageBtn" class="ghost">🆕 Ny sida</button>
+    <button id="importBtn" class="ghost">Importera JSON</button>
+    <input id="importFile" type="file" accept="application/json" style="display:none" />
+	
+
+    <button id="exportBtn" class="ghost">Exportera JSON</button>
+    <button id="openSort" class="ghost" title="Sortera (drag & släpp)">Sortera</button>
+    
+  </div>
+</header>
+
+<main class="container">
+  <div class="toolbar">
+    <div class="search">
+      <!-- sök borttagen -->
+    </div>
+  </div>
+
+  <div id="gallery" class="gallery" aria-live="polite"></div>
+</main>
+
+<!-- Sidepanel: Lägg till foto -->
+<aside id="sidepanel" class="sidepanel" aria-hidden="true">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+    <h3>Lägg till foto</h3>
+    <button id="closePanel" title="Stäng sidopanel" style="background:blue; border:none; font-size:22px; cursor:pointer; color:white;">×</button>
+  </div>
+
+  <label>Välj bild</label>
+  <input id="photoInput" type="file" accept="image/*" class="input">
+
+  <label>Bildtext</label>
+  <textarea id="captionInput" rows="3" class="input"></textarea>
+
+  <label>Etiketter (komma-separerade)</label>
+  <input id="labelInput" type="text" class="input">
+
+  <label>Back-länk (valfritt)</label>
+  <input id="backLinkInput" type="text" class="input">
+
+  <button id="addPhoto" style="width:100%; background:var(--header); color:white;">Lägg till foto</button>
+</aside>
+
+<!-- Sort (drag & drop) modal -->
+<div id="sortModal" aria-hidden="true">
+  <div class="panel">
+    <button class="closeSortBtn" id="closeSortBtn" title="Stäng">✖</button>
+    <h3 style="margin:0 0 10px 0;">Dra för att ändra ordning</h3>
+    <ul id="sortList" class="sort-list"></ul>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+      <button id="cancelSort" class="ghost">Avbryt</button>
+      <button id="saveSort" style="background:var(--header); color:white;">Spara ordning</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox / Big view -->
+<div id="bigModal" class="modal" aria-hidden="true">
+  <button class="closebtn" id="closeBig">✕</button>
+
+  <div class="modal-content">
+    <img id="bigImage" src="" alt="Stor bild">
+    <div id="bigCaption"></div>
+  </div>
+</div>
+
+<!-- ================================
+     SIDVÄLJARE (JSON i /data/)
+     ================================ -->
+<div id="pagePicker" class="modal" aria-hidden="true">
+  <div class="panel" style="background:white; padding:16px; border-radius:10px; min-width:300px; max-width:90vw;">
+    <h3 style="margin-top:0">Välj fotosida</h3>
+    <ul id="pageList" style="list-style:none; padding:0; margin:0 0 12px 0"></ul>
+    <button id="closePagePicker" style="background:var(--header); color:white;">Stäng</button>
+  </div>
+</div>
+
+
+<footer>Fotodokument — skapat av Leif Lindahl</footer>
+
+<script>
+ 
+/* ===== PERSON-ID FRÅN URL ===== */
+const params = new URLSearchParams(location.search);
+const PERSON_ID = params.get('id');
+const imageUrlCache = {};
+
+
+
+
+
+/*function getImageURL(id, blob) {
+  if (!id || !(blob instanceof Blob)) return null;
+
+  if (!objectUrlCache[id]) {
+    objectUrlCache[id] = URL.createObjectURL(blob);
+  }
+  return objectUrlCache[id];
+}*/
+
+//const objectUrlCache = Object.create(null);
+
+/*function getImageURL(id, blob) {
+  if (!id || !(blob instanceof Blob)) return null;
+
+  if (!objectUrlCache[id]) {
+    objectUrlCache[id] = URL.createObjectURL(blob);
+  }
+  return objectUrlCache[id];
+}*/
+
+window.addEventListener("beforeunload", () => {
+  for (const url of Object.values(objectUrlCache)) {
+    try { URL.revokeObjectURL(url); } catch {}
+  }
+});
+
+/* Städning vid sidstängning */
+window.addEventListener("beforeunload", () => {
+  for (const url of Object.values(objectUrlCache)) {
+    try { URL.revokeObjectURL(url); } catch(e){}
+  }
+});
+/* ============================================================
+   Fotosida — komplett fil
+   - Egen DB per sida via ?db=name
+   - Robust DB-open (hanterar existerande versioner & upgrades)
+   - Import/Export, New page, Sort, Add/Edit, Lightbox
+   ============================================================ */
+
+/* ---------------- DB name from URL ---------------- */
+function getDBName() {
+  try {
+    const p = new URLSearchParams(location.search);
+    const raw = (p.get("db") || "").trim();
+    if (!raw) return "FotosidaDB";
+    return raw.replace(/\s+/g, "_");
+  } catch (e) {
+    return "FotosidaDB";
+  }
+}
+
+/* ---------------- Globals ---------------- */
+let db = null;
+let metaCache = [];   // cached meta entries
+let objectUrlCache = {}; // id -> objectURL
+let currentSort = 'order';
+
+/* ---------------- Open DB robustly ----------------
+   - Tries to open existing DB version first
+   - If required stores missing, re-opens with version+1 to create them
+*/
+async function openDatabaseAuto() {
+  if (db) return db;
+  const name = getDBName();
+  console.log('Öppnar DB:', name);
+
+  // attempt to find existing DB version
+  let existingVersion = null;
+  try {
+    if (indexedDB.databases) {
+      const list = await indexedDB.databases();
+      const found = list.find(d => d.name === name);
+      if (found && found.version) existingVersion = found.version;
+    }
+  } catch (e) {
+    // ignore listing failure
+  }
+
+  // helper to perform open with given version (or without a version if null)
+  function openWithVersion(v) {
+    return new Promise((resolve, reject) => {
+      const req = (typeof v === 'number') ? indexedDB.open(name, v) : indexedDB.open(name);
+      req.onupgradeneeded = (ev) => {
+        const D = ev.target.result;
+        console.log('onupgradeneeded for', name, 'version', ev.newVersion);
+        if (!D.objectStoreNames.contains('images')) D.createObjectStore('images', { keyPath: 'id' });
+        if (!D.objectStoreNames.contains('meta')) {
+          const s = D.createObjectStore('meta', { keyPath: 'id' });
+          try { s.createIndex('order', 'order', { unique: false }); } catch(e){}
+        }
+        if (!D.objectStoreNames.contains('persons')) D.createObjectStore('persons', { keyPath: 'id' });
+      };
+      req.onsuccess = (ev) => {
+        db = ev.target.result;
+        // When DB is closed by page reload, clear db onclose handlers
+        db.onversionchange = () => { db.close(); db = null; };
+        resolve(db);
+      };
+      req.onerror = (ev) => reject(ev.target.error || ev);
+    });
+  }
+
+  // 1) Try open without forcing a higher version (safe)
+  try {
+    if (existingVersion == null) {
+      // no info: try simple open (creates DB if missing with version 1)
+      await openWithVersion(1);
+      return db;
+    } else {
+      // try opening with the existing version
+      await openWithVersion(existingVersion);
+      // check stores exist
+      const haveImages = db.objectStoreNames.contains('images');
+      const haveMeta = db.objectStoreNames.contains('meta');
+      if (haveImages && haveMeta) return db;
+      // if missing, close and upgrade
+      db.close();
+      db = null;
+      await openWithVersion(existingVersion + 1);
+      return db;
+    }
+  } catch (err) {
+    // fallback: open without version (let browser decide)
+    try {
+      await openWithVersion();
+      return db;
+    } catch (err2) {
+      console.error('Kunde inte öppna DB', err, err2);
+      throw err2;
+    }
+  }
+}
+
+function showCaptionPopup(captionText) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  `;
+
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background: #fff;
+    padding: 16px;
+    max-width: 500px;
+    max-height: 70vh;
+    overflow-y: auto;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.4;
+  `;
+
+  box.textContent = captionText || '(Ingen text)';
+
+  overlay.onclick = () => overlay.remove();
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
+/* ---------------- txn helper ---------------- */
+function txn(storeNames, mode='readonly') {
+  if (!db) throw new Error('DB inte initierad');
+  if (!Array.isArray(storeNames)) storeNames = [storeNames];
+  return db.transaction(storeNames, mode);
+}
+
+function nextFrame() {
+  return new Promise(res => requestAnimationFrame(() => res()));
+}
+
+
+
+/* ---------------- blob <-> dataURL ---------------- */
+function blobToDataURL(blob) {
+  return new Promise((res, rej) => {
+    if (!blob) return res(null);
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = () => rej(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+async function dataURLtoBlob(dataURL) {
+  const res = await fetch(dataURL);
+  return await res.blob();
+}
+
+/* ---------------- robust save helpers ---------------- */
+function saveImageBlob(id, blob) {
+  return new Promise((resolve, reject) => {
+    const t = txn('images', 'readwrite');
+    const req = t.objectStore('images').put({ id, blob });
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    };
+  });
+}
+function saveMeta(meta) {
+  return new Promise((resolve, reject) => {
+    const t = txn('meta', 'readwrite');
+    const req = t.objectStore('meta').put(meta);
+    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error);
+      t.onabort = () => reject(t.error);
+    };
+  });
+}
+
+
+
+function getAllMeta() {
+  return new Promise((res, rej) => {
+    const t = txn('meta','readonly');
+    const store = t.objectStore('meta');
+    const req = store.getAll();   // 🔥 INGET index
+
+    req.onsuccess = () => res(req.result || []);
+    req.onerror = () => rej(req.error);
+  });
+}
+
+
+
+
+function getImageBlob(id) {
+  return new Promise((res, rej) => {
+    const t = txn('images','readonly');
+    const req = t.objectStore('images').get(id);
+
+    req.onsuccess = () => {
+      const rec = req.result;
+      res(rec && rec.blob instanceof Blob ? rec.blob : null);
+    };
+
+    req.onerror = () => rej(req.error);
+  });
+}
+
+/* ----------------- UI helpers ---------------- */
+function revokeAllObjectUrls() {
+  for (const k in objectUrlCache) {
+    try { URL.revokeObjectURL(objectUrlCache[k]); } catch(e){}
+  }
+  objectUrlCache = {};
+}
+
+function setCurrentPerson(pid) {
+  window.currentPersonId = pid;
+
+  const title = document.getElementById('personTitle');
+  if (title) {
+    title.textContent = 'Foton för vald person';
+  }
+}
+
+async function loadPhotosForPerson(pid) {
+  const container = document.getElementById('gallery');
+  if (!container) return;
+
+  container.innerHTML = '';
+  revokeAllObjectUrls();
+
+  // Kopiera listan så vi kan modifiera metaCache säkert
+  const list = metaCache
+    .filter(m => typeof m.id === 'string' && m.id.startsWith(pid + '_'))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const m of list) {
+    let blob = null;
+
+    try {
+      blob = await getImageBlob(m.id);
+    } catch (err) {
+      console.warn('Kunde inte läsa bildblob:', m.id, err);
+    }
+
+    // 🚨 Trasig referens: meta finns men bild saknas
+    if (!(blob instanceof Blob)) {
+      console.warn('Tar bort trasig bildreferens:', m.id);
+
+      // 1) ta bort META ur IndexedDB
+      await new Promise((res, rej) => {
+        const t = txn('meta', 'readwrite');
+        t.objectStore('meta').delete(m.id);
+        t.oncomplete = res;
+        t.onerror = () => rej(t.error);
+      });
+
+      // 2) (valfritt men säkert) ta bort ev. skräpbild
+      await new Promise((res) => {
+        const t = txn('images', 'readwrite');
+        t.objectStore('images').delete(m.id);
+        t.oncomplete = res;
+        t.onerror = res;
+      });
+
+      // 3) ta bort ur cache
+      metaCache = metaCache.filter(x => x.id !== m.id);
+
+      // 4) rendera inte detta objekt
+      continue;
+    }
+	
+	function openImageFullscreen(src, caption) {
+  const modal = document.getElementById('bigModal');
+  const img = document.getElementById('bigImage');
+  const cap = document.getElementById('bigCaption');
+
+  img.src = src;
+  cap.textContent = caption || '';
+
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeImageFullscreen() {
+  const modal = document.getElementById('bigModal');
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+    /* ====== Allt nedan är nu GARANTERAT giltigt ====== */
+
+    const imageId = m.id;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const img = document.createElement('img');
+    //const url = getImageURL(imageId, blob);
+	const url = URL.createObjectURL(blob);
+    img.src = url;
+	objectUrlCache[m.id] = url;
+    
+	img.style.cursor = 'zoom-in';
+	img.onclick = () => {
+	openImageFullscreen(url, m.caption || '');
+	};
+
+    const caption = document.createElement('div');
+	caption.className = 'caption';
+	caption.textContent = m.caption || '';
+	//caption.onclick = () => {
+	//if ((m.caption || '').length > 0) {
+    //showCaptionPopup(m.caption);
+	//}
+	//};
+
+	
+
+    /* ---- Redigera ---- */
+    const editBtn = document.createElement('button');
+    editBtn.className = 'editBtn';
+    editBtn.textContent = '✏️';
+    editBtn.title = 'Redigera bildtext';
+    editBtn.onclick = (e) => {
+      e.stopPropagation();
+      openPanel(imageId);
+    };
+
+    /* ---- Ta bort ---- */
+    const delBtn = document.createElement('button');
+    delBtn.className = 'delBtn';
+    delBtn.textContent = '🗑';
+    delBtn.title = 'Ta bort bild';
+    delBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm('Ta bort bilden och bildtexten?')) return;
+      await deleteImage(imageId);
+      metaCache = metaCache.filter(x => x.id !== imageId);
+      await loadPhotosForPerson(pid);
+    };
+
+  
+	const imgWrap = document.createElement('div');
+	imgWrap.className = 'img-wrap';
+
+	imgWrap.appendChild(img);
+	imgWrap.appendChild(editBtn);
+	imgWrap.appendChild(delBtn);
+
+	card.appendChild(imgWrap);
+	card.appendChild(caption);
+
+	
+
+    container.appendChild(card);
+  }
+}
+
+
+async function loadAndRender() {
+  metaCache = await getAllMeta();   // 🔥 MÅSTE ske FÖRST
+
+  if (PERSON_ID) {
+    await loadPhotosForPerson(PERSON_ID);
+  } else {
+    await loadAllPhotos(); // om du har den kvar
+  }
+}
+
+
+
+/* ----------------- Add / Edit panel ---------------- */
+function openPanel(editId = null) {
+  const panel = document.getElementById('sidepanel');
+  if (!panel) return;
+  if (editId) {
+    panel.dataset.editId = editId;
+    const meta = (metaCache || []).find(m => m.id === editId) || {};
+    document.getElementById('captionInput').value = meta.caption || '';
+    document.getElementById('labelInput').value = (meta.labels||[]).join(', ');
+    document.getElementById('backLinkInput').value = meta.backLink || '';
+  } else {
+    delete panel.dataset.editId;
+    document.getElementById('captionInput').value = '';
+    document.getElementById('labelInput').value = '';
+    document.getElementById('backLinkInput').value = '';
+    const f = document.getElementById('photoInput'); if (f) f.value = '';
+  }
+  panel.classList.add('open'); panel.setAttribute('aria-hidden','false');
+}
+function closePanel() {
+  const panel = document.getElementById('sidepanel');
+  if (!panel) return;
+  panel.classList.remove('open'); panel.setAttribute('aria-hidden','true');
+  delete panel.dataset.editId;
+}
+
+/* ----------------- Add Photo handler ---------------- */
+async function addPhoto() {
+  await ensureDB();
+  const fileInput = document.getElementById('photoInput');
+  const caption = document.getElementById('captionInput').value.trim();
+  const labelsRaw = document.getElementById('labelInput').value.trim();
+  const labels = labelsRaw ? labelsRaw.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  const backLink = document.getElementById('backLinkInput').value.trim();
+
+  if (!fileInput.files.length && !document.getElementById('sidepanel').dataset.editId) {
+    alert('Välj en bild först.');
+    return;
+  }
+
+  const editingId = document.getElementById('sidepanel').dataset.editId || null;
+  //let id = editingId || ('img_' + Date.now());
+  const pid = window.currentPersonId;
+	if (!pid) {
+  alert('Ingen person vald');
+  return;
+}
+
+let id = editingId || (pid + '_' + Date.now());
+
+  if (fileInput.files.length) {
+    const file = fileInput.files[0];
+    const blob = file; // preserve mime
+    await saveImageBlob(id, blob);
+  }
+
+  const meta = { id, caption, labels, backLink, order: (editingId ? (await findMetaIndex(id)) : (metaCache.length>0 ? metaCache.length : 0) ) };
+  await saveMeta(meta);
+
+  fileInput.value = '';
+  document.getElementById('captionInput').value = '';
+  document.getElementById('labelInput').value = '';
+  document.getElementById('backLinkInput').value = '';
+
+  closePanel();
+  await loadAndRender();
+}
+
+/* find meta index/order */
+async function findMetaIndex(id) {
+  const all = await getAllMeta();
+  const idx = all.findIndex(m=>m.id===id);
+  return idx>=0 ? all[idx].order || idx : all.length;
+}
+
+/* delete image + meta */
+function deleteImage(id) {
+  return new Promise((res, rej) => {
+    const t1 = txn('images','readwrite');
+    t1.objectStore('images').delete(id);
+    t1.oncomplete = () => {
+      const t2 = txn('meta','readwrite');
+      t2.objectStore('meta').delete(id);
+      t2.oncomplete = () => res();
+      t2.onerror = ()=> rej(t2.error);
+    };
+    t1.onerror = ()=> rej(t1.error);
+  });
+}
+
+
+
+async function getAllImagesMap() {
+  return new Promise((resolve, reject) => {
+    const map = {};
+    const t = txn('images', 'readonly');
+    const store = t.objectStore('images');
+    const req = store.openCursor();
+
+    req.onsuccess = (e) => {
+      const cursor = e.target.result;
+      if (cursor) {
+        map[cursor.key] = cursor.value.blob;
+        cursor.continue();
+      } else {
+        resolve(map);
+      }
+    };
+
+    req.onerror = () => reject(req.error);
+  });
+}
+
+
+
+/* ----------------- Export ---------------- */
+/*async function exportAll() {
+  try {
+    await ensureDB();
+    const metas = await getAllMeta();
+    const blobs = [];
+    await new Promise((resolve, reject) => {
+      const t = txn('images','readonly');
+      const store = t.objectStore('images');
+      const req = store.openCursor();
+      req.onsuccess = (e) => {
+        const cur = e.target.result;
+        if (cur) {
+          blobs.push({ id: cur.value.id, blob: cur.value.blob });
+          cur.continue();
+        } else resolve();
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    const imagesMap = {};
+    for (const b of blobs) {
+      try {
+        const dataURL = await blobToDataURL(b.blob);
+        if (dataURL) imagesMap[b.id] = dataURL;
+      } catch(err) {
+        console.warn('Could not convert blob', b.id, err);
+      }
+    }
+
+    const outArray = metas.map(m => ({
+      id: m.id,
+      caption: m.caption || '',
+      labels: m.labels || [],
+      backLink: m.backLink || '',
+      order: m.order || 0,
+      dataURL: imagesMap[m.id] || null
+    }));
+
+    const jsonStr = JSON.stringify(outArray, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `fotosida_${getDBName()}.json`,
+          types: [{ description: "JSON-fil", accept: { "application/json": [".json"] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        alert("Export klar!");
+        return;
+      } catch (err) {
+        console.warn("Save picker avbruten eller misslyckades, fallback till nedladdning", err);
+      }
+    }
+
+    // fallback
+    const a = document.createElement('a');
+    a.href = getImageURL(image.id, image.blob);
+    a.download = `fotosida_${getDBName()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=> { try{ URL.revokeObjectURL(a.href); }catch(e){} a.remove(); }, 1500);
+
+    alert("Export klar (fallback).");
+
+  } catch(err) {
+    console.error('Export fel', err);
+    alert('Export misslyckades: ' + err);
+  }
+}*/
+
+async function exportAll() {
+  try {
+    console.log('Startar export…');
+
+    await ensureDB();
+
+    const metas = await getAllMeta();
+
+    /* ===== Läs alla bilder ===== */
+    //const imagesMap = {};
+   const imageEntries = [];
+
+await new Promise((resolve, reject) => {
+  const tx = txn('images', 'readonly');
+  const store = tx.objectStore('images');
+  const req = store.openCursor();
+
+  req.onsuccess = e => {
+    const cur = e.target.result;
+    if (!cur) {
+      resolve();
+      return;
+    }
+
+    imageEntries.push({
+      id: cur.key,
+      blob: cur.value.blob
+    });
+
+    cur.continue();
+  };
+
+  req.onerror = () => reject(req.error);
+});
+
+const imagesMap = {};
+
+for (const entry of imageEntries) {
+  if (!(entry.blob instanceof Blob)) continue;
+
+  try {
+    const dataURL = await blobToDataURL(entry.blob);
+    imagesMap[entry.id] = dataURL;
+  } catch (err) {
+    console.warn('Kunde inte konvertera bild', entry.id, err);
+  }
+}
+
+
+
+    /* ===== Slutligt JSON-objekt ===== */
+    const outArray = metas.map(m => ({
+      id: m.id,
+      caption: m.caption || '',
+      labels: m.labels || [],
+      backLink: m.backLink || '',
+      order: m.order || 0,
+      dataURL: imagesMap[m.id] || null
+    }));
+
+    const jsonStr = JSON.stringify(outArray, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+
+    /* ===== Försök Save Picker ===== */
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: `fotosida_${getDBName()}.json`,
+          types: [
+            { description: 'JSON-fil', accept: { 'application/json': ['.json'] } }
+          ]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        alert('Export klar!');
+        return;
+      } catch (err) {
+        console.warn('Save picker misslyckades – fallback används', err);
+      }
+    }
+
+    /* ===== Fallback: klassisk nedladdning ===== */
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `fotosida_${getDBName()}.json`;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 1000);
+
+    alert('Export klar!');
+
+  } catch (err) {
+    console.error('Export fel', err);
+    alert('Export misslyckades:\n' + err);
+  }
+}
+
+/* ----------------- Import ---------------- */
+async function importAllFile(file) {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    await ensureDB();
+
+    const metaList = [];
+    const imageList = [];
+	
+	if (Array.isArray(data)) {
+
+  const seenIds = new Set();
+
+  
+  
+  let importIndex = 0;
+
+for (const item of data) {
+  if (!item.id) continue;
+
+  metaList.push({
+    id: item.id,
+    caption: item.caption || '',
+    labels: item.labels || [],
+    backLink: item.backLink || '',
+    order: importIndex++   // 🔥 ALLTID unik ordning
+  });
+
+  if (item.dataURL) {
+    try {
+      const rawBlob = await dataURLtoBlob(item.dataURL);
+      const fixedBlob = new Blob(
+        [rawBlob],
+        { type: rawBlob.type || "image/jpeg" }
+      );
+      imageList.push({ id: item.id, blob: fixedBlob });
+    } catch (err) {
+      console.warn('Kunde ej konvertera bild', item.id, err);
+    }
+  }
+}
+
+}
+
+
+    
+	
+	else if (data && Array.isArray(data.meta) && typeof data.images === 'object') {
+      for (const m of data.meta) {
+        metaList.push({
+          id: m.id,
+          caption: m.caption || '',
+          labels: m.labels || [],
+          backLink: m.backLink || '',
+          order: m.order ?? 0
+        });
+      }
+      for (const id of Object.keys(data.images)) {
+        try {
+          const blob = await dataURLtoBlob(data.images[id]);
+          imageList.push({ id, blob });
+        } catch (err) {
+          console.warn('Kunde ej konvertera gammal bild', id, err);
+        }
+      }
+    } else {
+      throw new Error('Ogiltigt importformat');
+    }
+
+    const t = txn(['meta','images'],'readwrite');
+    const metaStore = t.objectStore('meta');
+    const imgStore = t.objectStore('images');
+
+    metaStore.clear();
+    imgStore.clear();
+
+   
+	// skriv META först (styr ordning)
+	for (const m of metaList) {
+	metaStore.put(m);
+	}
+
+	// skriv BILDER exakt 1 gång per ID
+	for (const i of imageList) {
+	imgStore.put({ id: i.id, blob: i.blob });
+	}
+
+
+    await new Promise((resolve, reject) => {
+      t.oncomplete = () => resolve();
+      t.onerror = () => reject(t.error || new Error('Transaktion fel vid import'));
+    });
+
+   /* alert('Import klar!');
+    await loadAndRender();*/
+	
+	alert('Import klar!');
+
+	// 🔥 KRITISKT: rensa gamla blob-URL:er
+	revokeAllObjectUrls();
+
+	// 🔥 låt IndexedDB + browser bli helt klara
+	await nextFrame();
+	await nextFrame();
+
+	// 🔥 rendera först nu
+	await loadAndRender();
+
+
+  } catch(err) {
+    console.error('Import error', err);
+    alert('Import misslyckades: ' + err);
+    throw err;
+  }
+}
+
+
+async function autoImportIfEmpty() {
+  const meta = await getAllMeta();
+  if (meta.length > 0) return;
+
+  const dbName = getDBName();
+  try {
+    const res = await fetch(`data/${dbName}.json`, { cache: 'no-store' });
+    if (!res.ok) return;
+
+    if (!confirm(`Databasen "${dbName}" är tom.\nVill du importera data från JSON?`))
+      return;
+
+    const text = await res.text();
+    const file = new File([text], `${dbName}.json`, { type: 'application/json' });
+    await importAllFile(file);
+
+  } catch (e) {
+    console.warn('Auto-import misslyckades eller saknas', e);
+  }
+}
+
+
+/* ----------------- New page ---------------- */
+async function newPage() {
+  if (!confirm("Vill du rensa alla bilder och börja en ny sida? Denna åtgärd går inte att ångra.")) return;
+  await ensureDB();
+  await new Promise((resolve, reject) => {
+    const t = txn(['images','meta'],'readwrite');
+    t.objectStore('images').clear();
+    t.objectStore('meta').clear();
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error || new Error("Kunde ej rensa DB"));
+  });
+  metaCache = [];
+  revokeAllObjectUrls();
+  await loadAndRender();
+  alert("Sidan är återställd (tom).");
+}
+
+/* ----------------- Sort modal ---------------- */
+const sortModal = document.getElementById('sortModal');
+const sortList = document.getElementById('sortList');
+function openSortModal() {
+  sortList.innerHTML = '';
+
+  metaCache
+    .filter(m => !PERSON_ID || m.id.startsWith(PERSON_ID + '_'))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .forEach(m => {
+
+      const li = document.createElement('li');
+      li.className = 'sort-item';
+      li.draggable = true;
+      li.dataset.id = m.id;
+
+      const img = document.createElement('img');
+
+      if (objectUrlCache[m.id]) {
+        img.src = objectUrlCache[m.id];
+      } else {
+        getImageBlob(m.id).then(blob => {
+
+          if (!(blob instanceof Blob)) {
+            console.warn('Tar bort trasig bildreferens:', m.id);
+
+            // ta bort från cache
+            metaCache = metaCache.filter(x => x.id !== m.id);
+
+            // ta bort från IndexedDB
+            const t = txn('meta', 'readwrite');
+            t.objectStore('meta').delete(m.id);
+
+            return; // ← viktigt
+          }
+
+          img.src = getImageURL(m.id, blob);
+          objectUrlCache[m.id] = img.src;
+        });
+      }
+
+      const txt = document.createElement('div');
+      txt.style.flex = '1';
+      txt.textContent = m.caption || '(Ingen text)';
+
+      li.appendChild(img);
+      li.appendChild(txt);
+
+      addDnDHandlers(li);
+      sortList.appendChild(li);
+    });
+
+  sortModal.style.display = 'flex';
+  sortModal.setAttribute('aria-hidden', 'false');
+
+  document.addEventListener('keydown', sortEscHandler);
+  setTimeout(() => document.addEventListener('click', sortOutsideClickHandler), 10);
+}
+
+function closeSortModal() {
+  sortModal.style.display = 'none';
+  sortModal.setAttribute('aria-hidden', 'true');
+  document.removeEventListener('keydown', sortEscHandler);
+  document.removeEventListener('click', sortOutsideClickHandler);
+}
+
+function sortEscHandler(e) {
+  if (e.key === 'Escape') closeSortModal();
+}
+
+function sortOutsideClickHandler(e) {
+  const panel = document.querySelector('#sortModal .panel');
+  if (panel && !panel.contains(e.target)) closeSortModal();
+}
+
+/* drag & drop */
+let dragEl = null;
+
+function addDnDHandlers(li) {
+  li.addEventListener('dragstart', e => {
+    dragEl = li;
+    li.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+
+  li.addEventListener('dragend', () => {
+    li.classList.remove('dragging');
+    dragEl = null;
+  });
+
+  li.addEventListener('dragover', e => {
+    e.preventDefault();
+    const target = e.currentTarget;
+    if (!dragEl || target === dragEl) return;
+
+    const rect = target.getBoundingClientRect();
+    const after = (e.clientY - rect.top) > rect.height / 2;
+    target.parentNode.insertBefore(dragEl, after ? target.nextSibling : target);
+  });
+}
+
+/* ----------------- Save sort ----------------- */
+async function saveSortOrder() {
+  const items = Array.from(sortList.children);
+
+  await ensureDB();
+
+  await new Promise((resolve, reject) => {
+    const t = txn('meta', 'readwrite');
+    const store = t.objectStore('meta');
+
+    items.forEach((li, idx) => {
+      const id = li.dataset.id;
+      const req = store.get(id);
+      req.onsuccess = () => {
+        if (req.result) {
+          req.result.order = idx;
+          store.put(req.result);
+        }
+      };
+    });
+
+    t.oncomplete = resolve;
+    t.onerror = () => reject(t.error);
+  });
+
+  closeSortModal();
+
+  metaCache = await getAllMeta();
+  await loadPhotosForPerson(PERSON_ID);
+}
+
+/* ----------------- ensureDB ---------------- */
+async function ensureDB() { if (!db) await openDatabaseAuto(); return db; }
+
+/* ============================================================
+   SIDVÄLJARE – LÄSER /data/index.json
+   ============================================================ */
+
+async function loadPageIndex() {
+  const res = await fetch('data/index.json', { cache: 'no-store' });
+  if (!res.ok) throw new Error('Kunde inte läsa data/index.json');
+  return await res.json();
+}
+
+async function openPagePicker() {
+  const modal = document.getElementById('pagePicker');
+  const list = document.getElementById('pageList');
+  list.innerHTML = '<li>Laddar…</li>';
+
+  try {
+    const pages = await loadPageIndex();
+    list.innerHTML = '';
+
+    pages.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = p.title || p.id;
+      li.style.padding = '8px';
+      li.style.cursor = 'pointer';
+      li.style.borderBottom = '1px solid #eee';
+
+      li.addEventListener('click', () => {
+        location.href = `${location.pathname}?db=${encodeURIComponent(p.id)}`;
+      });
+
+      list.appendChild(li);
+    });
+
+    if (pages.length === 0) {
+      list.innerHTML = '<li>Inga sidor hittades</li>';
+    }
+
+  } catch (err) {
+    console.error(err);
+    list.innerHTML = '<li>Kunde inte läsa sidlista</li>';
+  }
+
+  modal.classList.add('show');
+  modal.setAttribute('aria-hidden', 'false');
+}
+
+function closePagePicker() {
+  const modal = document.getElementById('pagePicker');
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+
+
+
+/* ----------------- UI bindings ---------------- */
+function setupBindings() {
+  document.getElementById('openPanelTop').addEventListener('click', ()=> openPanel(null));
+  document.getElementById('closePanel').addEventListener('click', ()=> closePanel());
+  document.getElementById('addPhoto').addEventListener('click', addPhoto);
+  
+ /* document.getElementById('openPagePicker')
+  .addEventListener('click', openPagePicker);*/
+  const openPageBtn = document.getElementById('openPagePicker');
+	if (openPageBtn) {
+	openPageBtn.addEventListener('click', openPagePicker);
+	}
+
+
+document.getElementById('closePagePicker')
+  .addEventListener('click', closePagePicker);
+
+
+  document.getElementById('importBtn').addEventListener('click', ()=> document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      await importAllFile(f);
+      await loadAndRender();
+      alert('Import klar');
+    } catch(err) {
+      console.error('Import failed', err);
+      alert('Import misslyckades: ' + err);
+    } finally {
+      e.target.value = '';
+    }
+  });
+  document.getElementById('exportBtn').addEventListener('click', exportAll);
+  document.getElementById('openSort').addEventListener('click', openSortModal);
+  document.getElementById('closeSortBtn').addEventListener('click', closeSortModal);
+  document.getElementById('cancelSort').addEventListener('click', closeSortModal);
+  document.getElementById('saveSort').addEventListener('click', saveSortOrder);
+  //document.getElementById('backToPerson').addEventListener('click', ()=> { location.href = 'person.html'; });
+  const backBtn = document.getElementById('backToPerson');
+	if (backBtn) {
+	backBtn.addEventListener('click', () => {
+    if (!PERSON_ID) {
+      alert('Ingen person vald');
+      return;
+    }
+    location.href = 'person.html?id=' + PERSON_ID;
+  });
+}
+  document.getElementById('closeBig').addEventListener('click', ()=> document.getElementById('bigModal').classList.remove('show'));
+  document.getElementById('newPageBtn').addEventListener('click', newPage);
+}
+
+function closeImageFullscreen() {
+  const modal = document.getElementById('bigModal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+
+
+
+/* ----------------- Boot ---------------- */
+(async function boot(){
+	metaCache = metaCache.filter(m => typeof m.id === 'string');
+  try {
+    await openDatabaseAuto();
+	if (PERSON_ID) {
+	setCurrentPerson(PERSON_ID);   // ⭐ KRITISK RAD
+	}
+    setupBindings();
+    await loadAndRender();
+    console.log('DB & UI init klara — DB =', getDBName());
+	await autoImportIfEmpty();
+  } catch(err) {
+    console.error('Init failed', err);
+    alert('Kunde inte initiera databasen: ' + err);
+  }
+  
+    // ===== Fullscreen modal stängning =====
+
+  const bigModal = document.getElementById('bigModal');
+const closeBtn = document.getElementById('closeBig');
+
+if (bigModal) {
+  bigModal.addEventListener('click', (e) => {
+    if (e.target === bigModal) {
+      closeImageFullscreen();
+    }
+  });
+}
+
+
+
+  
+})();
+
+</script>
+</body>
+</html>
