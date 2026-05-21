@@ -710,7 +710,7 @@ const gkidLayouts = children.map((_, i) => {
     return {
       id: gid,
       x: childCXs[i],                 // samma X som föräldern
-      y: gkidY + j * (cardH + 30)     // stapla lodrätt
+      y: gkidY + j * (cardH + 42)     // stapla lodrätt
     };
   });
 });
@@ -818,7 +818,7 @@ g.append("line")
   .attr("x2", ccx)
   .attr("y2", childY)
   .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 2);
+  .attr("stroke-width", 1,5);
 
     gkidLayouts[i].forEach(gc => {
 
@@ -832,9 +832,11 @@ g.append("line")
  // första barnbarnet skapar huvudlinjen
 if(gc === gkidLayouts[i][0] && gkidLayouts[i].length > 1){
 
-  const topY = childY + cardH + 30;
-  const bottomY =
-    gkidLayouts[i][gkidLayouts[i].length - 1].y;
+  const topY = childY + cardH + 18;
+
+// stanna precis ovanför sista kortet
+const bottomY =
+  gkidLayouts[i][gkidLayouts[i].length - 1].y - 12;
 
   // vertikal huvudlinje
   g.append("line")
@@ -859,7 +861,7 @@ if(gc === gkidLayouts[i][0] && gkidLayouts[i].length > 1){
 g.append("line")
   .attr("x1", ccx)
   .attr("y1", gc.y + cardH/2)
-  .attr("x2", ccx - 25)
+  .attr("x2", ccx - 18)
   .attr("y2", gc.y + cardH/2)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 2);
