@@ -651,7 +651,13 @@ function drawGenealogy(rootId){
   const childY   = hasDesc      ? rootY + yGap                                      : null;
   const gkidY    = hasGkids     ? rootY + (hasDesc ? 2:1)*yGap                     : null;
 
-  const totalCanvasH = (gkidY||childY||rootY) + cardH + 40;
+  const maxGrandchildren =
+  Math.max(1, ...gkidGroups.map(g => g.length));
+
+const totalCanvasH =
+  (gkidY || childY || rootY)
+  + maxGrandchildren * (cardH + 30)
+  + 80;
 
   // ── Step 4: assign X centres, bottom-up ──────────────────────────────────
   // All centres are expressed as pixel x of card left edge.
@@ -685,13 +691,16 @@ function drawGenealogy(rootId){
     });
   }
 
-  // ── Grandchildren — spread under their parent child ──
-  const gkidCXs = children.map((_, i) => {
-    const n = gkidGroups[i].length;
-    if(n === 0) return [];
-    const bandW = (n - 1) * slotW;
-    return Array.from({length:n}, (_,j) => childCXs[i] - bandW/2 + j*slotW);
+ // ── Grandchildren — vertical layout under each child ──
+const gkidLayouts = children.map((_, i) => {
+  return gkidGroups[i].map((gid, j) => {
+    return {
+      id: gid,
+      x: childCXs[i],                 // samma X som föräldern
+      y: gkidY + j * (cardH + 30)     // stapla lodrätt
+    };
   });
+});
 
   // ── Parents — centred over root, but spread to cover grandparents ──
   // Father needs room for up to 2 grandparents, mother likewise.
@@ -767,11 +776,24 @@ function drawGenealogy(rootId){
     drawNode(g, cx2x(ccx), childY, cid);
     drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
 
-    gkidGroups[i].forEach((gid, j) => {
-      const gcx = gkidCXs[i][j];
-      drawNode(g, cx2x(gcx), gkidY, gid);
-      drawCurve(g, ccx, childY+cardH, gcx, gkidY);
-    });
+    gkidLayouts[i].forEach(gc => {
+
+  drawNode(
+    g,
+    cx2x(gc.x),
+    gc.y,
+    gc.id
+  );
+
+  drawCurve(
+    g,
+    ccx,
+    childY + cardH,
+    gc.x,
+    gc.y
+  );
+
+});
   });
 
   // ── Step 6: auto-fit ─────────────────────────────────────────────────────
