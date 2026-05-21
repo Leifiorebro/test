@@ -589,7 +589,7 @@ function drawGenealogy(rootId){
 
   const cardW = 220;   // card pixel width
   const cardH = 105;
-  const xPad  = 20;    // minimum horizontal gap between any two cards
+  const xPad  = 70;    // minimum horizontal gap between any two cards
   const yGap  = 130;   // vertical gap between rows
 
   // ── Step 1: collect the 5 rows of nodes ──────────────────────────────────
@@ -623,7 +623,17 @@ function drawGenealogy(rootId){
   function gkidSlots(i){ return Math.max(1, gkidGroups[i].length); }
 
   // Width needed by child i's sub-tree (at least 1 slot, at least as wide as its grandchildren):
-  function childSubtreeSlots(i){ return Math.max(1, gkidSlots(i)); }
+  function childSubtreeSlots(i){
+
+  const gk = gkidGroups[i].length;
+
+  // bredare kolumn för många barnbarn
+  if(gk >= 5) return 3;
+
+  if(gk >= 3) return 2;
+
+  return 1;
+}
 
   // Total slots needed by all children together:
   const totalChildSlots = children.length === 0 ? 1
@@ -710,7 +720,7 @@ const gkidLayouts = children.map((_, i) => {
     return {
       id: gid,
       x: childCXs[i],                 // samma X som föräldern
-      y: gkidY + j * (cardH + 42)     // stapla lodrätt
+      y: gkidY + j * (cardH + 55)     // stapla lodrätt
     };
   });
 });
@@ -820,7 +830,23 @@ g.append("line")
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1,5);
 
-    gkidLayouts[i].forEach(gc => {
+  // ===== LINJER FÖRST =====
+
+gkidLayouts[i].forEach(gc => {
+
+  g.append("line")
+    .attr("x1", ccx)
+    .attr("y1", gc.y + cardH/2)
+    .attr("x2", ccx - 18)
+    .attr("y2", gc.y + cardH/2)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 1.5);
+
+});
+
+// ===== KORT EFTERÅT =====
+
+gkidLayouts[i].forEach(gc => {
 
   drawNode(
     g,
@@ -828,43 +854,6 @@ g.append("line")
     gc.y,
     gc.id
   );
-
- // första barnbarnet skapar huvudlinjen
-if(gc === gkidLayouts[i][0] && gkidLayouts[i].length > 1){
-
-  const topY = childY + cardH + 18;
-
-// stanna precis ovanför sista kortet
-const bottomY =
-  gkidLayouts[i][gkidLayouts[i].length - 1].y - 12;
-
-  // vertikal huvudlinje
-  g.append("line")
-    .attr("x1", ccx)
-    .attr("y1", topY)
-    .attr("x2", ccx)
-    .attr("y2", bottomY)
-    .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 2);
-
-  // anslutning från barn
-  g.append("line")
-    .attr("x1", ccx)
-    .attr("y1", childY + cardH)
-    .attr("x2", ccx)
-    .attr("y2", topY)
-    .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 2);
-}
-
-// liten sidolinje till barnbarnet
-g.append("line")
-  .attr("x1", ccx)
-  .attr("y1", gc.y + cardH/2)
-  .attr("x2", ccx - 18)
-  .attr("y2", gc.y + cardH/2)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 2);
 
 });
   });
