@@ -574,9 +574,9 @@ function drawGenealogy(rootId){
   const zoom = d3.zoom().scaleExtent([0.15, 4]).on("zoom", e => g.attr("transform", e.transform));
   svg.call(zoom);
 
-  const cardW = 240;   // card pixel width
+  const cardW = 220;   // card pixel width
   const cardH = 120;
-  const xPad  = 10;    // minimum horizontal gap between any two cards
+  const xPad  = 15;    // minimum horizontal gap between any two cards
   const yGap  = 150;   // vertical gap between rows
 
   // ── Step 1: collect the 5 rows of nodes ──────────────────────────────────
