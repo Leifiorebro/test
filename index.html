@@ -566,35 +566,59 @@ function drawNode(g, x, y, id){
   }
 }
 
-function drawCurve(g, x1,y1,x2,y2, spouse=false){
-  if(spouse) return;
-  g.append("path")
-   .attr("class", "tree-link")
-   .attr("d", `M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}`);
+function drawCurve(g, x1, y1, x2, y2, spouse=false){
+
+  // makar = rak horisontell linje
+  if(spouse){
+
+    g.append("line")
+      .attr("x1", x1)
+      .attr("y1", y1)
+      .attr("x2", x2)
+      .attr("y2", y2)
+      .attr("stroke", "#8aa0b8")
+      .attr("stroke-width", 1.5)
+      .attr("stroke-linecap", "round");
+
+    return;
+  }
+
+  // T-koppling
+
+  const midY = (y1 + y2) / 2;
+
+  // lodrät del
+  g.append("line")
+    .attr("x1", x1)
+    .attr("y1", y1)
+    .attr("x2", x1)
+    .attr("y2", midY)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 1.5)
+    .attr("stroke-linecap", "round");
+
+  // vågrät del
+  g.append("line")
+    .attr("x1", x1)
+    .attr("y1", midY)
+    .attr("x2", x2)
+    .attr("y2", midY)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 1.5)
+    .attr("stroke-linecap", "round");
+
+  // lodrät del ned
+  g.append("line")
+    .attr("x1", x2)
+    .attr("y1", midY)
+    .attr("x2", x2)
+    .attr("y2", y2)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 1.5)
+    .attr("stroke-linecap", "round");
 }
 
-function drawTLine(g, x1, y1, x2, y2){
 
- // vågrät linje till toppen av barnkortet
-g.append("line")
-  .attr("x1", childAnchorCX)
-  .attr("y1", childY - 16)
-  .attr("x2", ccx)
-  .attr("y2", childY - 16)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5)
-  .attr("stroke-linecap", "round");
-
-// lodrät liten anslutning ned i kortet
-g.append("line")
-  .attr("x1", ccx)
-  .attr("y1", childY - 16)
-  .attr("x2", ccx)
-  .attr("y2", childY)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5)
-  .attr("stroke-linecap", "round");
-}
 
 
 
