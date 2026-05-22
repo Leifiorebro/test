@@ -847,31 +847,42 @@ const gkidLayouts = children.map((_, i) => {
 // lodrät linje ned från root
 // ===== T-koppling root -> barn =====
 
+// ===== Elegant T-koppling root -> barn =====
+
 const branchY = childY - 22;
 
-// lodrät från root
+// barnkortets MITT
+const childMidX = ccx;
+
+// barnkortets VÄNSTERKANT
+const childLeftX = cx2x(ccx);
+
+// rootkortets mitt
+const rootMidX = rootCX;
+
+// lodrät stam från root
 g.append("line")
-  .attr("x1", rootCX)
+  .attr("x1", rootMidX)
   .attr("y1", rootY + cardH)
-  .attr("x2", rootCX)
+  .attr("x2", rootMidX)
   .attr("y2", branchY)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5);
 
-// vågrät gren
+// vågrät gren fram till kortets kant
 g.append("line")
-  .attr("x1", rootCX)
+  .attr("x1", rootMidX)
   .attr("y1", branchY)
-  .attr("x2", ccx)
+  .attr("x2", childLeftX)
   .attr("y2", branchY)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5);
 
-// liten lodrät hake ned i barnkortet
+// liten lodrät hake exakt vid kortets kant
 g.append("line")
-  .attr("x1", ccx)
+  .attr("x1", childLeftX)
   .attr("y1", branchY)
-  .attr("x2", ccx)
+  .attr("x2", childLeftX)
   .attr("y2", childY)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5);
@@ -900,16 +911,16 @@ g.append("line")
 g.append("line")
   .attr("x1", ccx)
   .attr("y1", branchY)
-  .attr("x2", gc.x)
+  .attr("x2", cx2x(gc.x))
   .attr("y2", branchY)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5);
 
 // liten hake ned i barnbarnskortet
 g.append("line")
-  .attr("x1", gc.x)
+  .attr("x1", cx2x(gc.x))
   .attr("y1", branchY)
-  .attr("x2", gc.x)
+  .attr("x2", cx2x(gc.x))
   .attr("y2", gc.y)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5);
