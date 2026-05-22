@@ -28,20 +28,7 @@ input[type="text"],input[type="date"],textarea,select{width:100%} textarea{min-h
 .list{border:1px solid #e5e7eb;border-radius:12px;padding:8px;max-height:160px;overflow:auto;background:#fafcff}
 .listItem{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed #e5e7eb}.listItem:last-child{border-bottom:none}
 .listItem button{padding:4px 8px;font-size:12px;border:none;border-radius:8px;cursor:pointer;background:#e2e8f0}
-svg{display:block;width:100%;height:100%}
-.node-card{
-  fill:#ffffff;
-  stroke:#cbd5e1;
-  stroke-width:1.2;
-  rx:18;
-  ry:18;
-  filter:drop-shadow(0 8px 18px rgba(0,0,0,.10));
-}
-.node-current{
-  stroke:#2563eb;
-  stroke-width:4;
-  filter:drop-shadow(0 0 18px rgba(37,99,235,.35));
-}
+svg{display:block;width:100%;height:100%}.node-card{fill:var(--card);stroke:#cbd5e1;stroke-width:1.5;rx:14;ry:14;filter:drop-shadow(0 4px 10px rgba(0,0,0,.08))}.node-current{stroke:var(--accent);stroke-width:3}
 .node-name{font-size:14px;font-weight:700;fill:#111827}.node-dates{font-size:11px;fill:#4b5563}.node-role{font-size:11px;fill:#2563eb}
 .tree-link{fill:none;stroke:var(--line);stroke-width:2}.tree-link-spouse{fill:none;stroke:#d97706;stroke-width:2;stroke-dasharray:6 4}
 .badge{display:inline-block;font-size:11px;padding:2px 6px;border-radius:999px;background:#e0ecff;color:#1d4ed8;margin-left:6px}.warning{color:#92400e;font-size:12px}.success{color:var(--ok);font-size:12px}
@@ -566,69 +553,12 @@ function drawNode(g, x, y, id){
   }
 }
 
-function drawCurve(g, x1, y1, x2, y2, spouse=false){
-
-  // ===== MAKA-LINJER =====
-  if(spouse){
-
-    // avgör riktning
-    const leftX  = Math.min(x1, x2);
-    const rightX = Math.max(x1, x2);
-
-    // linjen skall gå mellan kortkanterna
-    const startX = leftX  + cardW/2;
-    const endX   = rightX - cardW/2;
-
-    g.append("line")
-      .attr("x1", startX)
-      .attr("y1", y1)
-      .attr("x2", endX)
-      .attr("y2", y2)
-      .attr("stroke", "#8aa0b8")
-      .attr("stroke-width", 1.5)
-      .attr("stroke-linecap", "round");
-
-    return;
-  }
-
-  // ===== FÖRÄLDER/BARN T-KOPPLING =====
-
-  const branchY = y2 - 22;
-
-  // start/slut från kortkanter
-  const startX = x1;
-  const endX   = x2;
-
-  // lodrät stam ned från förälderns nederkant
-  g.append("line")
-    .attr("x1", startX)
-    .attr("y1", y1)
-    .attr("x2", startX)
-    .attr("y2", branchY)
-    .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 1.5);
-
-  // vågrät gren
-  g.append("line")
-    .attr("x1", startX)
-    .attr("y1", branchY)
-    .attr("x2", endX)
-    .attr("y2", branchY)
-    .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 1.5);
-
-  // liten hake ned till barnkortets överkant
-  g.append("line")
-    .attr("x1", endX)
-    .attr("y1", branchY)
-    .attr("x2", endX)
-    .attr("y2", y2)
-    .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 1.5);
+function drawCurve(g, x1,y1,x2,y2, spouse=false){
+  if(spouse) return;
+  g.append("path")
+   .attr("class", "tree-link")
+   .attr("d", `M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}`);
 }
-
-
-
 
 // ── Bottom-up layout engine: calculates subtree widths before placing any node ──
 function drawGenealogy(rootId){
@@ -644,10 +574,10 @@ function drawGenealogy(rootId){
   const zoom = d3.zoom().scaleExtent([0.15, 4]).on("zoom", e => g.attr("transform", e.transform));
   svg.call(zoom);
 
-  const cardW = 220;   // card pixel width
-  const cardH = 105;
-  const xPad  = 70;    // minimum horizontal gap between any two cards
-  const yGap  = 130;   // vertical gap between rows
+  const cardW = 260;   // card pixel width
+  const cardH = 120;
+  const xPad  = 20;    // minimum horizontal gap between any two cards
+  const yGap  = 150;   // vertical gap between rows
 
   // ── Step 1: collect the 5 rows of nodes ──────────────────────────────────
   // Row layout (top → bottom):
@@ -680,17 +610,7 @@ function drawGenealogy(rootId){
   function gkidSlots(i){ return Math.max(1, gkidGroups[i].length); }
 
   // Width needed by child i's sub-tree (at least 1 slot, at least as wide as its grandchildren):
-  function childSubtreeSlots(i){
-
-  const gk = gkidGroups[i].length;
-
-  // bredare kolumn för många barnbarn
-  if(gk >= 5) return 3;
-
-  if(gk >= 3) return 2;
-
-  return 1;
-}
+  function childSubtreeSlots(i){ return Math.max(1, gkidSlots(i)); }
 
   // Total slots needed by all children together:
   const totalChildSlots = children.length === 0 ? 1
@@ -777,7 +697,7 @@ const gkidLayouts = children.map((_, i) => {
     return {
       id: gid,
       x: childCXs[i],                 // samma X som föräldern
-      y: gkidY + j * (cardH + 55)     // stapla lodrätt
+      y: gkidY + j * (cardH + 30)     // stapla lodrätt
     };
   });
 });
@@ -833,28 +753,9 @@ const gkidLayouts = children.map((_, i) => {
   }
 
   // parents
-  if(fatherId){ drawNode(g, cx2x(fatherCX), parentY, fatherId); drawCurve(
-  g,
-  fatherCX,
-  parentY + cardH,
-  cx2x(rootCX),
-  rootY
-); }
-  if(motherId){ drawNode(g, cx2x(motherCX), parentY, motherId); drawCurve(
-  g,
-  motherCX,
-  parentY + cardH,
-  cx2x(rootCX),
-  rootY
-); }
-  if(fatherId && motherId){ drawCurve(
-  g,
-  cx2x(fatherCX),
-  parentY + cardH/2,
-  cx2x(motherCX),
-  parentY + cardH/2,
-  true
-); }
+  if(fatherId){ drawNode(g, cx2x(fatherCX), parentY, fatherId); drawCurve(g, fatherCX, parentY+cardH, rootCX, rootY); }
+  if(motherId){ drawNode(g, cx2x(motherCX), parentY, motherId); drawCurve(g, motherCX, parentY+cardH, rootCX, rootY); }
+  if(fatherId && motherId){ drawCurve(g, fatherCX, parentY+cardH/2, motherCX, parentY+cardH/2, true); }
 
   // root
   drawNode(g, cx2x(rootCX), rootY, rootId);
@@ -864,14 +765,7 @@ const gkidLayouts = children.map((_, i) => {
     const scx = spouseCXs[i];
     drawNode(g, cx2x(scx), rootY, sid);
     const prevCX = i === 0 ? rootCX : spouseCXs[i-1];
-    drawCurve(
-  g,
-  cx2x(prevCX),
-  rootY + cardH/2,
-  cx2x(scx),
-  rootY + cardH/2,
-  true
-);
+    drawCurve(g, prevCX, rootY+cardH/2, scx, rootY+cardH/2, true);
   });
 
   // children + grandchildren
@@ -879,103 +773,24 @@ const gkidLayouts = children.map((_, i) => {
   const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
   children.forEach((cid, i) => {
     const ccx = childCXs[i];
-    
-    // Horisontell huvudlinje
+    drawNode(g, cx2x(ccx), childY, cid);
+    drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
 
-
-// lodrät linje ned från root
-// ===== T-koppling root -> barn =====
-
-// ===== Elegant T-koppling root -> barn =====
-
-const branchY = childY - 22;
-
-// barnkortets MITT
-const childMidX = ccx;
-
-// barnkortets VÄNSTERKANT
-const childLeftX = cx2x(ccx);
-
-// rootkortets mitt
-const rootMidX = rootCX;
-
-// lodrät stam från root
-g.append("line")
-  .attr("x1", rootMidX)
-  .attr("y1", rootY + cardH)
-  .attr("x2", rootMidX)
-  .attr("y2", branchY)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5);
-
-// vågrät gren fram till kortets kant
-g.append("line")
-  .attr("x1", rootMidX)
-  .attr("y1", branchY)
-  .attr("x2", childLeftX)
-  .attr("y2", branchY)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5);
-
-// liten lodrät hake exakt vid kortets kant
-g.append("line")
-  .attr("x1", childLeftX)
-  .attr("y1", branchY)
-  .attr("x2", childLeftX)
-  .attr("y2", childY)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5);
-
-  // ===== LINJER FÖRST =====
-  
-	//const childMidX = ccx;
-	const childBottomY = childY + cardH + 1;
-  
-gkidLayouts[i].forEach(gc => {
-
-  const branchY = gc.y - 22;
-
-  
-  // lodrät stam exakt från kortets nederkant
-// lodrät stam från barnkort
-g.append("line")
-  .attr("x1", ccx)
-  .attr("y1", childY + cardH)
-  .attr("x2", ccx)
-  .attr("y2", branchY)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5);
-
-// vågrät gren till barnbarn
-g.append("line")
-  .attr("x1", ccx)
-  .attr("y1", branchY)
-  .attr("x2", cx2x(gc.x))
-  .attr("y2", branchY)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5);
-
-// liten hake ned i barnbarnskortet
-g.append("line")
-  .attr("x1", cx2x(gc.x))
-  .attr("y1", branchY)
-  .attr("x2", cx2x(gc.x))
-  .attr("y2", gc.y)
-  .attr("stroke", "#8aa0b8")
-  .attr("stroke-width", 1.5);
-});
-
-drawNode(g, cx2x(ccx), childY, cid);
-
-// ===== KORT EFTERÅT =====
-
-gkidLayouts[i].forEach(gc => {
+    gkidLayouts[i].forEach(gc => {
 
   drawNode(
     g,
     cx2x(gc.x),
     gc.y,
     gc.id
+  );
+
+  drawCurve(
+    g,
+    ccx,
+    childY + cardH,
+    gc.x,
+    gc.y
   );
 
 });
