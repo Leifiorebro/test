@@ -568,7 +568,7 @@ function drawNode(g, x, y, id){
 
 function drawCurve(g, x1, y1, x2, y2, spouse=false){
 
-  // makar = rak horisontell linje
+  // makar = rak linje mellan kortens kanter
   if(spouse){
 
     g.append("line")
@@ -583,39 +583,34 @@ function drawCurve(g, x1, y1, x2, y2, spouse=false){
     return;
   }
 
-  // T-koppling
-
   const midY = (y1 + y2) / 2;
 
-  // lodrät del
+  // lodrät ned
   g.append("line")
     .attr("x1", x1)
     .attr("y1", y1)
     .attr("x2", x1)
     .attr("y2", midY)
     .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 1.5)
-    .attr("stroke-linecap", "round");
+    .attr("stroke-width", 1.5);
 
-  // vågrät del
+  // vågrät
   g.append("line")
     .attr("x1", x1)
     .attr("y1", midY)
     .attr("x2", x2)
     .attr("y2", midY)
     .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 1.5)
-    .attr("stroke-linecap", "round");
+    .attr("stroke-width", 1.5);
 
-  // lodrät del ned
+  // lodrät ned till exakt kortkant
   g.append("line")
     .attr("x1", x2)
     .attr("y1", midY)
     .attr("x2", x2)
     .attr("y2", y2)
     .attr("stroke", "#8aa0b8")
-    .attr("stroke-width", 1.5)
-    .attr("stroke-linecap", "round");
+    .attr("stroke-width", 1.5);
 }
 
 
@@ -859,7 +854,7 @@ g.append("line")
   .attr("x1", childAnchorCX)
   .attr("y1", rootY + cardH)
   .attr("x2", childAnchorCX)
-  .attr("y2", childY + cardH/2)
+  .attr("y2", childY -16)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5)
   .attr("stroke-linecap", "round");
@@ -867,9 +862,9 @@ g.append("line")
 // vågrät linje fram till barnkortets vänsterkant
 g.append("line")
   .attr("x1", childAnchorCX)
-  .attr("y1", childY + cardH/2)
-  .attr("x2", childLeft)
-  .attr("y2", childY + cardH/2)
+  .attr("y1", childY -16)
+  .attr("x2", ccx)
+  .attr("y2", childY -16)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5)
   .attr("stroke-linecap", "round");
