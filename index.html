@@ -823,9 +823,14 @@ const gkidLayouts = children.map((_, i) => {
     const ccx = childCXs[i];
     drawNode(g, cx2x(ccx), childY, cid);
     // Horisontell huvudlinje
-// ===== T-koppling root -> barn =====
+
 
 // lodrät linje ned från root
+// ===== T-koppling root -> barn =====
+
+const childLeft = cx2x(ccx);
+
+// lodrät linje från root
 g.append("line")
   .attr("x1", childAnchorCX)
   .attr("y1", rootY + cardH)
@@ -835,11 +840,11 @@ g.append("line")
   .attr("stroke-width", 1.5)
   .attr("stroke-linecap", "round");
 
-// vågrät linje till barnet
+// vågrät linje fram till barnkortets vänsterkant
 g.append("line")
   .attr("x1", childAnchorCX)
   .attr("y1", childY + cardH/2)
-  .attr("x2", ccx)
+  .attr("x2", childLeft)
   .attr("y2", childY + cardH/2)
   .attr("stroke", "#8aa0b8")
   .attr("stroke-width", 1.5)
@@ -849,6 +854,7 @@ g.append("line")
 gkidLayouts[i].forEach(gc => {
 
   const yMid = gc.y + cardH/2;
+  const gcLeft = cx2x(gc.x);
 
   // lodrät stam
   g.append("line")
@@ -860,11 +866,11 @@ gkidLayouts[i].forEach(gc => {
     .attr("stroke-width", 1.5)
     .attr("stroke-linecap", "round");
 
-  // sidolinje till kortet
+  // vågrät linje till barnbarnskort
   g.append("line")
     .attr("x1", ccx)
     .attr("y1", yMid)
-    .attr("x2", gc.x)
+    .attr("x2", gcLeft)
     .attr("y2", yMid)
     .attr("stroke", "#8aa0b8")
     .attr("stroke-width", 1.5)
