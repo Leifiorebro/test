@@ -568,13 +568,21 @@ function drawNode(g, x, y, id){
 
 function drawCurve(g, x1, y1, x2, y2, spouse=false){
 
-  // makar = rak linje mellan kortens kanter
+  // ===== MAKA-LINJER =====
   if(spouse){
 
+    // avgör riktning
+    const leftX  = Math.min(x1, x2);
+    const rightX = Math.max(x1, x2);
+
+    // linjen skall gå mellan kortkanterna
+    const startX = leftX  + cardW/2;
+    const endX   = rightX - cardW/2;
+
     g.append("line")
-      .attr("x1", x1)
+      .attr("x1", startX)
       .attr("y1", y1)
-      .attr("x2", x2)
+      .attr("x2", endX)
       .attr("y2", y2)
       .attr("stroke", "#8aa0b8")
       .attr("stroke-width", 1.5)
@@ -583,36 +591,41 @@ function drawCurve(g, x1, y1, x2, y2, spouse=false){
     return;
   }
 
-  const midY = (y1 + y2) / 2;
+  // ===== FÖRÄLDER/BARN T-KOPPLING =====
 
-  // lodrät ned
+  const branchY = y2 - 22;
+
+  // start/slut från kortkanter
+  const startX = x1;
+  const endX   = x2;
+
+  // lodrät stam ned från förälderns nederkant
   g.append("line")
-    .attr("x1", x1)
+    .attr("x1", startX)
     .attr("y1", y1)
-    .attr("x2", x1)
-    .attr("y2", midY)
+    .attr("x2", startX)
+    .attr("y2", branchY)
     .attr("stroke", "#8aa0b8")
     .attr("stroke-width", 1.5);
 
-  // vågrät
+  // vågrät gren
   g.append("line")
-    .attr("x1", x1)
-    .attr("y1", midY)
-    .attr("x2", x2)
-    .attr("y2", midY)
+    .attr("x1", startX)
+    .attr("y1", branchY)
+    .attr("x2", endX)
+    .attr("y2", branchY)
     .attr("stroke", "#8aa0b8")
     .attr("stroke-width", 1.5);
 
-  // lodrät ned till exakt kortkant
+  // liten hake ned till barnkortets överkant
   g.append("line")
-    .attr("x1", x2)
-    .attr("y1", midY)
-    .attr("x2", x2)
+    .attr("x1", endX)
+    .attr("y1", branchY)
+    .attr("x2", endX)
     .attr("y2", y2)
     .attr("stroke", "#8aa0b8")
     .attr("stroke-width", 1.5);
 }
-
 
 
 
@@ -820,9 +833,28 @@ const gkidLayouts = children.map((_, i) => {
   }
 
   // parents
-  if(fatherId){ drawNode(g, cx2x(fatherCX), parentY, fatherId); drawCurve(g, fatherCX, parentY+cardH, rootCX, rootY); }
-  if(motherId){ drawNode(g, cx2x(motherCX), parentY, motherId); drawCurve(g, motherCX, parentY+cardH, rootCX, rootY); }
-  if(fatherId && motherId){ drawCurve(g, fatherCX, parentY+cardH/2, motherCX, parentY+cardH/2, true); }
+  if(fatherId){ drawNode(g, cx2x(fatherCX), parentY, fatherId); drawCurve(
+  g,
+  fatherCX,
+  parentY + cardH,
+  cx2x(rootCX),
+  rootY
+); }
+  if(motherId){ drawNode(g, cx2x(motherCX), parentY, motherId); drawCurve(
+  g,
+  motherCX,
+  parentY + cardH,
+  cx2x(rootCX),
+  rootY
+); }
+  if(fatherId && motherId){ drawCurve(
+  g,
+  cx2x(fatherCX),
+  parentY + cardH/2,
+  cx2x(motherCX),
+  parentY + cardH/2,
+  true
+); }
 
   // root
   drawNode(g, cx2x(rootCX), rootY, rootId);
@@ -832,7 +864,14 @@ const gkidLayouts = children.map((_, i) => {
     const scx = spouseCXs[i];
     drawNode(g, cx2x(scx), rootY, sid);
     const prevCX = i === 0 ? rootCX : spouseCXs[i-1];
-    drawCurve(g, prevCX, rootY+cardH/2, scx, rootY+cardH/2, true);
+    drawCurve(
+  g,
+  cx2x(prevCX),
+  rootY + cardH/2,
+  cx2x(scx),
+  rootY + cardH/2,
+  true
+);
   });
 
   // children + grandchildren
