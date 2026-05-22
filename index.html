@@ -691,16 +691,20 @@ const totalCanvasH =
     });
   }
 
- // ── Grandchildren — vertical layout under each child ──
-const gkidLayouts = children.map((_, i) => {
-  return gkidGroups[i].map((gid, j) => {
-    return {
-      id: gid,
-      x: childCXs[i],                 // samma X som föräldern
-      y: gkidY + j * (cardH + 30)     // stapla lodrätt
-    };
+  // ── Grandchildren — spread horizontally under each child ──
+  // Each grandchild gets its own slot centred under the child.
+  // childCXs[i] is already the centre of the i-th child's subtree.
+  const gkidLayouts = children.map((_, i) => {
+    const gkids = gkidGroups[i];
+    const n = gkids.length;
+    if(!n) return [];
+    const bandW = (n - 1) * slotW;
+    return gkids.map((gid, j) => ({
+      id:  gid,
+      cx:  childCXs[i] - bandW/2 + j * slotW,   // horizontal spread
+      y:   gkidY                                  // same row for all grandchildren
+    }));
   });
-});
 
   // ── Parents — centred over root, but spread to cover grandparents ──
   // Father needs room for up to 2 grandparents, mother likewise.
@@ -777,23 +781,10 @@ const gkidLayouts = children.map((_, i) => {
     drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
 
     gkidLayouts[i].forEach(gc => {
-
-  drawNode(
-    g,
-    cx2x(gc.x),
-    gc.y,
-    gc.id
-  );
-
-  drawCurve(
-    g,
-    ccx,
-    childY + cardH,
-    gc.x,
-    gc.y
-  );
-
-});
+      drawNode(g, cx2x(gc.cx), gc.y, gc.id);
+      // Line from bottom of child card to top of grandchild card
+      drawCurve(g, ccx, childY + cardH, gc.cx, gc.y);
+    });
   });
 
   // ── Step 6: auto-fit ─────────────────────────────────────────────────────
