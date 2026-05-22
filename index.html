@@ -872,7 +872,7 @@ g.append("line")
   // ===== LINJER FÖRST =====
 gkidLayouts[i].forEach(gc => {
 
-  const yMid = gc.y + cardH/2;
+  const yMid = gc.y -16;
   const gcLeft = cx2x(gc.x);
 
   // lodrät stam
@@ -889,7 +889,7 @@ gkidLayouts[i].forEach(gc => {
   g.append("line")
     .attr("x1", ccx)
     .attr("y1", yMid)
-    .attr("x2", gcLeft)
+    .attr("x2", gc.x)
     .attr("y2", yMid)
     .attr("stroke", "#8aa0b8")
     .attr("stroke-width", 1.5)
