@@ -28,7 +28,20 @@ input[type="text"],input[type="date"],textarea,select{width:100%} textarea{min-h
 .list{border:1px solid #e5e7eb;border-radius:12px;padding:8px;max-height:160px;overflow:auto;background:#fafcff}
 .listItem{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed #e5e7eb}.listItem:last-child{border-bottom:none}
 .listItem button{padding:4px 8px;font-size:12px;border:none;border-radius:8px;cursor:pointer;background:#e2e8f0}
-svg{display:block;width:100%;height:100%}.node-card{fill:var(--card);stroke:#cbd5e1;stroke-width:1.5;rx:14;ry:14;filter:drop-shadow(0 4px 10px rgba(0,0,0,.08))}.node-current{stroke:var(--accent);stroke-width:3}
+svg{display:block;width:100%;height:100%}
+.node-card{
+  fill:#ffffff;
+  stroke:#cbd5e1;
+  stroke-width:1.2;
+  rx:18;
+  ry:18;
+  filter:drop-shadow(0 8px 18px rgba(0,0,0,.10));
+}
+.node-current{
+  stroke:#2563eb;
+  stroke-width:4;
+  filter:drop-shadow(0 0 18px rgba(37,99,235,.35));
+}
 .node-name{font-size:14px;font-weight:700;fill:#111827}.node-dates{font-size:11px;fill:#4b5563}.node-role{font-size:11px;fill:#2563eb}
 .tree-link{fill:none;stroke:var(--line);stroke-width:2}.tree-link-spouse{fill:none;stroke:#d97706;stroke-width:2;stroke-dasharray:6 4}
 .badge{display:inline-block;font-size:11px;padding:2px 6px;border-radius:999px;background:#e0ecff;color:#1d4ed8;margin-left:6px}.warning{color:#92400e;font-size:12px}.success{color:var(--ok);font-size:12px}
@@ -560,6 +573,29 @@ function drawCurve(g, x1,y1,x2,y2, spouse=false){
    .attr("d", `M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}`);
 }
 
+function drawTLine(g, x1, y1, x2, y2){
+
+  // lodrät del
+  g.append("line")
+    .attr("x1", x1)
+    .attr("y1", y1)
+    .attr("x2", x1)
+    .attr("y2", y2)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 2);
+
+  // vågrät del
+  g.append("line")
+    .attr("x1", x1)
+    .attr("y1", y2)
+    .attr("x2", x2)
+    .attr("y2", y2)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 2);
+}
+
+
+
 // ── Bottom-up layout engine: calculates subtree widths before placing any node ──
 function drawGenealogy(rootId){
   if(!rootId || !store.people[rootId]) return;
@@ -574,10 +610,10 @@ function drawGenealogy(rootId){
   const zoom = d3.zoom().scaleExtent([0.15, 4]).on("zoom", e => g.attr("transform", e.transform));
   svg.call(zoom);
 
-  const cardW = 260;   // card pixel width
-  const cardH = 120;
-  const xPad  = 20;    // minimum horizontal gap between any two cards
-  const yGap  = 150;   // vertical gap between rows
+  const cardW = 220;   // card pixel width
+  const cardH = 105;
+  const xPad  = 70;    // minimum horizontal gap between any two cards
+  const yGap  = 130;   // vertical gap between rows
 
   // ── Step 1: collect the 5 rows of nodes ──────────────────────────────────
   // Row layout (top → bottom):
@@ -610,7 +646,17 @@ function drawGenealogy(rootId){
   function gkidSlots(i){ return Math.max(1, gkidGroups[i].length); }
 
   // Width needed by child i's sub-tree (at least 1 slot, at least as wide as its grandchildren):
-  function childSubtreeSlots(i){ return Math.max(1, gkidSlots(i)); }
+  function childSubtreeSlots(i){
+
+  const gk = gkidGroups[i].length;
+
+  // bredare kolumn för många barnbarn
+  if(gk >= 5) return 3;
+
+  if(gk >= 3) return 2;
+
+  return 1;
+}
 
   // Total slots needed by all children together:
   const totalChildSlots = children.length === 0 ? 1
@@ -697,7 +743,7 @@ const gkidLayouts = children.map((_, i) => {
     return {
       id: gid,
       x: childCXs[i],                 // samma X som föräldern
-      y: gkidY + j * (cardH + 30)     // stapla lodrätt
+      y: gkidY + j * (cardH + 55)     // stapla lodrätt
     };
   });
 });
@@ -774,23 +820,65 @@ const gkidLayouts = children.map((_, i) => {
   children.forEach((cid, i) => {
     const ccx = childCXs[i];
     drawNode(g, cx2x(ccx), childY, cid);
-    drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
+    // Horisontell huvudlinje
+// ===== T-koppling root -> barn =====
 
-    gkidLayouts[i].forEach(gc => {
+// lodrät linje ned från root
+g.append("line")
+  .attr("x1", childAnchorCX)
+  .attr("y1", rootY + cardH)
+  .attr("x2", childAnchorCX)
+  .attr("y2", childY + cardH/2)
+  .attr("stroke", "#8aa0b8")
+  .attr("stroke-width", 1.5)
+  .attr("stroke-linecap", "round");
+
+// vågrät linje till barnet
+g.append("line")
+  .attr("x1", childAnchorCX)
+  .attr("y1", childY + cardH/2)
+  .attr("x2", ccx)
+  .attr("y2", childY + cardH/2)
+  .attr("stroke", "#8aa0b8")
+  .attr("stroke-width", 1.5)
+  .attr("stroke-linecap", "round");
+
+  // ===== LINJER FÖRST =====
+gkidLayouts[i].forEach(gc => {
+
+  const yMid = gc.y + cardH/2;
+
+  // lodrät stam
+  g.append("line")
+    .attr("x1", ccx)
+    .attr("y1", childY + cardH)
+    .attr("x2", ccx)
+    .attr("y2", yMid)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 1.5)
+    .attr("stroke-linecap", "round");
+
+  // sidolinje till kortet
+  g.append("line")
+    .attr("x1", ccx)
+    .attr("y1", yMid)
+    .attr("x2", gc.x - cardW/2)
+    .attr("y2", yMid)
+    .attr("stroke", "#8aa0b8")
+    .attr("stroke-width", 1.5)
+    .attr("stroke-linecap", "round");
+
+});
+
+// ===== KORT EFTERÅT =====
+
+gkidLayouts[i].forEach(gc => {
 
   drawNode(
     g,
     cx2x(gc.x),
     gc.y,
     gc.id
-  );
-
-  drawCurve(
-    g,
-    ccx,
-    childY + cardH,
-    gc.x,
-    gc.y
   );
 
 });
