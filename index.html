@@ -610,6 +610,7 @@ function drawGenealogy(rootId){
   function gkidSlots(i){ return Math.max(1, gkidGroups[i].length); }
 
   // Width needed by child i's sub-tree (at least 1 slot, at least as wide as its grandchildren):
+  // Use 0.95 factor matching gkSlotW so grandchildren don't overlap siblings
   function childSubtreeSlots(i){ return Math.max(1, gkidSlots(i)); }
 
   // Total slots needed by all children together:
@@ -654,10 +655,9 @@ function drawGenealogy(rootId){
   const maxGrandchildren =
   Math.max(1, ...gkidGroups.map(g => g.length));
 
-const totalCanvasH =
-  (gkidY || childY || rootY)
-  + maxGrandchildren * (cardH + 30)
-  + 80;
+const maxGkStack = gkidGroups.reduce((m,g)=> Math.max(m, g.length), 0);
+const gkStackH  = maxGkStack > 0 ? maxGkStack * (cardH + 20) : cardH;
+const totalCanvasH = (gkidY || childY || rootY) + gkStackH + 80;
 
   // ── Step 4: assign X centres, bottom-up ──────────────────────────────────
   // All centres are expressed as pixel x of card left edge.
@@ -691,18 +691,15 @@ const totalCanvasH =
     });
   }
 
-  // ── Grandchildren — spread horizontally under each child ──
-  // Each grandchild gets its own slot centred under the child.
-  // childCXs[i] is already the centre of the i-th child's subtree.
+  // ── Grandchildren — stacked vertically under each child ──
+  const gkGapY = 20;
   const gkidLayouts = children.map((_, i) => {
     const gkids = gkidGroups[i];
-    const n = gkids.length;
-    if(!n) return [];
-    const bandW = (n - 1) * slotW;
+    if(!gkids.length) return [];
     return gkids.map((gid, j) => ({
-      id:  gid,
-      cx:  childCXs[i] - bandW/2 + j * slotW,   // horizontal spread
-      y:   gkidY                                  // same row for all grandchildren
+      id: gid,
+      cx: childCXs[i],
+      y:  gkidY + j * (cardH + gkGapY)
     }));
   });
 
@@ -780,10 +777,14 @@ const totalCanvasH =
     drawNode(g, cx2x(ccx), childY, cid);
     drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
 
-    gkidLayouts[i].forEach(gc => {
+    gkidLayouts[i].forEach((gc, gi) => {
       drawNode(g, cx2x(gc.cx), gc.y, gc.id);
-      // Line from bottom of child card to top of grandchild card
-      drawCurve(g, ccx, childY + cardH, gc.cx, gc.y);
+      const fromY = gi === 0 ? childY + cardH : gkidLayouts[i][gi-1].y + cardH;
+      g.append("line")
+        .attr("x1", gc.cx).attr("y1", fromY)
+        .attr("x2", gc.cx).attr("y2", gc.y)
+        .attr("stroke", "var(--line)")
+        .attr("stroke-width", 2);
     });
   });
 
