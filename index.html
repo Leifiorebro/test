@@ -560,6 +560,59 @@ function drawCurve(g, x1,y1,x2,y2, spouse=false){
    .attr("d", `M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}`);
 }
 
+function drawNodeCompact(g, x, y, id){
+  const p = getPerson(id); if(!p) return;
+  const w = 180, h = cardH;
+  const imgSize = 44;
+  const imgPad  = 6;
+  const txtX    = imgSize + imgPad * 2 + 2;
+  const txtW    = w - txtX - 6;
+  const maxCh   = Math.floor(txtW / 6.5);
+  function trunc(s, n){ return s && s.length > n ? s.slice(0,n-1)+"…" : (s||""); }
+
+  const grp = g.append("g")
+    .attr("transform", `translate(${x},${y})`)
+    .style("cursor","pointer")
+    .on("click", ()=>openPerson(id));
+
+  grp.append("rect")
+    .attr("class", "node-card" + (id===store.currentId ? " node-current" : ""))
+    .attr("width", w).attr("height", h).attr("rx", 14).attr("ry", 14);
+
+  const clipId = "cliC_" + id;
+  grp.append("clipPath").attr("id", clipId)
+    .append("rect").attr("x", imgPad).attr("y", (h-imgSize)/2)
+    .attr("width", imgSize).attr("height", imgSize).attr("rx", 6).attr("ry", 6);
+
+  grp.append("image")
+    .attr("x", imgPad).attr("y", (h-imgSize)/2)
+    .attr("width", imgSize).attr("height", imgSize)
+    .attr("clip-path", `url(#${clipId})`)
+    .attr("preserveAspectRatio", "xMidYMid slice")
+    .on("error", function(){ d3.select(this).attr("href", "images/default.jpg"); })
+    .attr("href", `images/${id}.jpg`);
+
+  grp.append("text").attr("class","node-name").attr("font-size","12px")
+    .attr("x", txtX).attr("y", 18).text(trunc(p.name||"", maxCh));
+
+  if(p.born){
+    grp.append("text").attr("class","node-dates").attr("x", txtX).attr("y", 34)
+      .text(trunc("f. "+(p.born||""), maxCh));
+  }
+  if(p.died){
+    grp.append("text").attr("class","node-dates").attr("x", txtX).attr("y", 48)
+      .text(trunc("d. "+(p.died||""), maxCh));
+  }
+  const age = calcAge(p.born, p.died);
+  if(age){
+    grp.append("text").attr("class","node-dates")
+      .attr("x", w-6).attr("y", h-6)
+      .attr("text-anchor","end").attr("fill","#9ca3af")
+      .text(age);
+  }
+}
+
+
 // ── Bottom-up layout engine: calculates subtree widths before placing any node ──
 function drawGenealogy(rootId){
   if(!rootId || !store.people[rootId]) return;
@@ -603,19 +656,22 @@ function drawGenealogy(rootId){
   const motherGP = motherId ? (store.parentsOf[motherId]||[]).slice(0,2) : [];
 
   // ── Step 2: bottom-up width calculation ──────────────────────────────────
-  // Width of a single card slot (card + one padding on each side):
+  // slotW: full slot for ancestors, root, spouses (needs room for 2 grandparents side by side)
   const slotW = cardW + xPad;
 
-  // Width needed by the grandchildren row for child i:
-  function gkidSlots(i){ return Math.max(1, gkidGroups[i].length); }
+  // childSlotW: all children use a compact slot since grandchildren are stacked vertically.
+  // Gap between child cards = 10px (much tighter than the 20px ancestor gap).
+  // Compact card for child-level: narrower card = much tighter row
+  const compactW    = 180;              // compact card width (vs full cardW=260)
+  const compactH    = cardH;            // same height
+  const childGap    = 10;              // gap between compact child cards
+  const childSlotW  = compactW + childGap;  // 190px — vs 280px full slot
+  function childSlotPx(){ return childSlotW; }
 
-  // Width needed by child i's sub-tree (at least 1 slot, at least as wide as its grandchildren):
-  // Use 0.95 factor matching gkSlotW so grandchildren don't overlap siblings
-  function childSubtreeSlots(i){ return Math.max(1, gkidSlots(i)); }
 
-  // Total slots needed by all children together:
-  const totalChildSlots = children.length === 0 ? 1
-    : children.reduce((s,_,i) => s + childSubtreeSlots(i), 0);
+  // Total pixel width needed by all children together:
+  const totalChildPx = children.length === 0 ? slotW
+    : children.reduce((s,_,i) => s + childSlotPx(i), 0);
 
   // Total slots for the root row (root + all spouses):
   const rootRowSlots = 1 + spouseIds.length;
@@ -625,13 +681,13 @@ function drawGenealogy(rootId){
   const motherSlots = motherId ? Math.max(1, motherGP.length > 0 ? motherGP.length : 1) : 0;
   const parentRowSlots = Math.max(1, fatherSlots + motherSlots);
 
-  // Grandparent row slots = fatherGP count + motherGP count (min 1 each if parent exists):
+  // Grandparent row slots:
   const gpRowSlots = (fatherId ? Math.max(2, fatherGP.length) : 0)
                    + (motherId ? Math.max(2, motherGP.length) : 0);
 
-  // The canvas total width is driven by the widest row:
-  const maxSlots = Math.max(totalChildSlots, rootRowSlots, parentRowSlots, gpRowSlots || 1);
-  const canvasW  = maxSlots * slotW + xPad;
+  // Canvas width driven by widest row (children row now in px, others in slots):
+  const ancestorPx = Math.max(rootRowSlots, parentRowSlots, gpRowSlots || 1) * slotW;
+  const canvasW    = Math.max(totalChildPx, ancestorPx) + xPad;
 
   // ── Step 3: assign Y rows ────────────────────────────────────────────────
   // Anchor: we want the root to sit roughly in the vertical middle of the 5 rows.
@@ -676,18 +732,17 @@ const totalCanvasH = (gkidY || childY || rootY) + gkStackH + 80;
   // ── Spouse (right of root, one slot gap) ──
   const spouseCXs = spouseIds.map((_, i) => rootCX + (i + 1) * slotW);
 
-  // ── Children — spread them centred under root+spouse midpoint ──
+  // ── Children — spread using per-child pixel widths ──
   let childCXs = [];
   if(children.length > 0){
     const lastSpouseCX = spouseCXs.length > 0 ? spouseCXs[spouseCXs.length-1] : null;
-  const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
-    const childBandW = (totalChildSlots - 1) * slotW;
-    // Each child gets a centre based on its subtree share:
-    let cursor = childAnchorCX - childBandW/2;
+    const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
+    // Place each child at the centre of its own slot
+    let cursor = childAnchorCX - totalChildPx/2;
     children.forEach((_,i) => {
-      const sub = childSubtreeSlots(i);
-      childCXs.push(cursor + (sub-1)*slotW/2);
-      cursor += sub * slotW;
+      const w = childSlotPx(i);
+      childCXs.push(cursor + w/2);
+      cursor += w;
     });
   }
 
@@ -774,11 +829,14 @@ const totalCanvasH = (gkidY || childY || rootY) + gkStackH + 80;
   const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
   children.forEach((cid, i) => {
     const ccx = childCXs[i];
-    drawNode(g, cx2x(ccx), childY, cid);
+    // Use compact card for children — narrower to fit more siblings
+    const childCardX = ccx - compactW/2;
+    drawNodeCompact(g, childCardX, childY, cid);
     drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
 
     gkidLayouts[i].forEach((gc, gi) => {
-      drawNode(g, cx2x(gc.cx), gc.y, gc.id);
+      // Grandchildren also use compact cards since they're in a narrow column
+      drawNodeCompact(g, gc.cx - compactW/2, gc.y, gc.id);
       const fromY = gi === 0 ? childY + cardH : gkidLayouts[i][gi-1].y + cardH;
       g.append("line")
         .attr("x1", gc.cx).attr("y1", fromY)
