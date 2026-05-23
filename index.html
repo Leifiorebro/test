@@ -560,6 +560,9 @@ function drawCurve(g, x1,y1,x2,y2, spouse=false){
    .attr("d", `M${x1},${y1} C${x1},${(y1+y2)/2} ${x2},${(y1+y2)/2} ${x2},${y2}`);
 }
 
+const cardW = 260;   // global card dimensions used by drawNode and drawNodeCompact
+const cardH = 120;
+
 function drawNodeCompact(g, x, y, id){
   const p = getPerson(id); if(!p) return;
   const w = 180, h = cardH;
@@ -627,8 +630,7 @@ function drawGenealogy(rootId){
   const zoom = d3.zoom().scaleExtent([0.15, 4]).on("zoom", e => g.attr("transform", e.transform));
   svg.call(zoom);
 
-  const cardW = 260;   // card pixel width
-  const cardH = 120;
+  // cardW and cardH are global constants (defined below drawNodeCompact)
   const xPad  = 20;    // minimum horizontal gap between any two cards
   const yGap  = 150;   // vertical gap between rows
 
