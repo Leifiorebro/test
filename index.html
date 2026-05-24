@@ -28,7 +28,7 @@ input[type="text"],input[type="date"],textarea,select{width:100%} textarea{min-h
 .list{border:1px solid #e5e7eb;border-radius:12px;padding:8px;max-height:160px;overflow:auto;background:#fafcff}
 .listItem{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed #e5e7eb}.listItem:last-child{border-bottom:none}
 .listItem button{padding:4px 8px;font-size:12px;border:none;border-radius:8px;cursor:pointer;background:#e2e8f0}
-svg{display:block;width:100%;height:100%}.node-card{fill:var(--card);stroke:#cbd5e1;stroke-width:1.5;rx:14;ry:14;filter:drop-shadow(0 4px 10px rgba(0,0,0,.08))}.node-current{stroke:var(--accent);stroke-width:3}
+svg{display:block;width:100%;height:100%}.node-card{fill:var(--card);stroke:#cbd5e1;stroke-width:1.5;rx:14;ry:14;filter:drop-shadow(0 4px 10px rgba(0,0,0,.08))}.node-current{stroke:var(--accent);stroke-width:3}.node-child{fill:#dbeafe;stroke:#93c5fd;stroke-width:1.5;rx:14;ry:14;filter:drop-shadow(0 4px 10px rgba(0,0,0,.08))}.node-grandchild{fill:#dcfce7;stroke:#86efac;stroke-width:1.5;rx:14;ry:14;filter:drop-shadow(0 4px 10px rgba(0,0,0,.08))}
 .node-name{font-size:14px;font-weight:700;fill:#111827}.node-dates{font-size:11px;fill:#4b5563}.node-role{font-size:11px;fill:#2563eb}
 .tree-link{fill:none;stroke:var(--line);stroke-width:2}.tree-link-spouse{fill:none;stroke:#d97706;stroke-width:2;stroke-dasharray:6 4}
 .badge{display:inline-block;font-size:11px;padding:2px 6px;border-radius:999px;background:#e0ecff;color:#1d4ed8;margin-left:6px}.warning{color:#92400e;font-size:12px}.success{color:var(--ok);font-size:12px}
@@ -563,7 +563,8 @@ function drawCurve(g, x1,y1,x2,y2, spouse=false){
 const cardW = 260;   // global card dimensions used by drawNode and drawNodeCompact
 const cardH = 120;
 
-function drawNodeCompact(g, x, y, id){
+// level: "child" = blue card, "grandchild" = green card
+function drawNodeCompact(g, x, y, id, level="child"){
   const p = getPerson(id); if(!p) return;
   const w = 180, h = cardH;
   const imgSize = 44;
@@ -571,15 +572,19 @@ function drawNodeCompact(g, x, y, id){
   const txtX    = imgSize + imgPad * 2 + 2;
   const txtW    = w - txtX - 6;
   const maxCh   = Math.floor(txtW / 6.5);
-  function trunc(s, n){ return s && s.length > n ? s.slice(0,n-1)+"…" : (s||""); }
+  function trunc(s, n){ return s && s.length > n ? s.slice(0,n-1)+"\u2026" : (s||""); }
 
   const grp = g.append("g")
     .attr("transform", `translate(${x},${y})`)
     .style("cursor","pointer")
     .on("click", ()=>openPerson(id));
 
+  // Card background — blue for children, green for grandchildren
+  const cardClass = id===store.currentId ? "node-current"
+                  : level==="grandchild"  ? "node-grandchild"
+                  :                         "node-child";
   grp.append("rect")
-    .attr("class", "node-card" + (id===store.currentId ? " node-current" : ""))
+    .attr("class", cardClass)
     .attr("width", w).attr("height", h).attr("rx", 14).attr("ry", 14);
 
   const clipId = "cliC_" + id;
@@ -595,17 +600,34 @@ function drawNodeCompact(g, x, y, id){
     .on("error", function(){ d3.select(this).attr("href", "images/default.jpg"); })
     .attr("href", `images/${id}.jpg`);
 
+  // Row y-positions — 7 rows to fit name, born, parish, died, parish, job, age
+  let row = 17;
+  const dy = 14;
+
   grp.append("text").attr("class","node-name").attr("font-size","12px")
-    .attr("x", txtX).attr("y", 18).text(trunc(p.name||"", maxCh));
+    .attr("x", txtX).attr("y", row).text(trunc(p.name||"", maxCh));
+  row += dy;
 
   if(p.born){
-    grp.append("text").attr("class","node-dates").attr("x", txtX).attr("y", 34)
+    grp.append("text").attr("class","node-dates").attr("x", txtX).attr("y", row)
       .text(trunc("f. "+(p.born||""), maxCh));
+    row += dy - 2;
+  }
+  if(p.bornParish){
+    grp.append("text").attr("class","node-dates").attr("fill","#6b7280")
+      .attr("x", txtX).attr("y", row).text(trunc(p.bornParish, maxCh));
+    row += dy - 2;
   }
   if(p.died){
-    grp.append("text").attr("class","node-dates").attr("x", txtX).attr("y", 48)
+    grp.append("text").attr("class","node-dates").attr("x", txtX).attr("y", row)
       .text(trunc("d. "+(p.died||""), maxCh));
+    row += dy - 2;
   }
+  if(p.diedParish){
+    grp.append("text").attr("class","node-dates").attr("fill","#6b7280")
+      .attr("x", txtX).attr("y", row).text(trunc(p.diedParish, maxCh));
+  }
+
   const age = calcAge(p.born, p.died);
   if(age){
     grp.append("text").attr("class","node-dates")
@@ -833,12 +855,12 @@ const totalCanvasH = (gkidY || childY || rootY) + gkStackH + 80;
     const ccx = childCXs[i];
     // Use compact card for children — narrower to fit more siblings
     const childCardX = ccx - compactW/2;
-    drawNodeCompact(g, childCardX, childY, cid);
+    drawNodeCompact(g, childCardX, childY, cid, "child");
     drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
 
     gkidLayouts[i].forEach((gc, gi) => {
       // Grandchildren also use compact cards since they're in a narrow column
-      drawNodeCompact(g, gc.cx - compactW/2, gc.y, gc.id);
+      drawNodeCompact(g, gc.cx - compactW/2, gc.y, gc.id, "grandchild");
       const fromY = gi === 0 ? childY + cardH : gkidLayouts[i][gi-1].y + cardH;
       g.append("line")
         .attr("x1", gc.cx).attr("y1", fromY)
