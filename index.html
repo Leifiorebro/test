@@ -166,6 +166,8 @@ async function loadServerJSON(){
       store.spousesOf = {};
     }
     store.people ||= {}; store.parentsOf ||= {}; store.childrenOf ||= {}; store.spousesOf ||= {};
+    // Always rebuild childrenOf from parentsOf on load — never trust the stored version
+    rebuildChildren(false);
     repairData(false);
     if(!store.currentId || !store.people[store.currentId]) store.currentId = findBestRoot();
     saveLocal();
@@ -670,10 +672,30 @@ function drawGenealogy(rootId){
   const fatherId  = parents[0]||null;
   const motherId  = parents[1]||null;
   const spouseIds = uniq(store.spousesOf[rootId]||[]);
-  const children  = sortIdsByBorn(store.childrenOf[rootId]||[]);
+  // Build children live: anyone whose parentsOf includes rootId OR spouseIds
+  // This ensures children appear even if childrenOf is stale/incomplete.
+  const rootAndSpouses = new Set([rootId, ...(store.spousesOf[rootId]||[])]);
+  const liveChildren = Object.keys(store.parentsOf)
+    .filter(pid => (store.parentsOf[pid]||[]).some(par => par === rootId));
+  const storeChildren = store.childrenOf[rootId] || [];
+  const children = sortIdsByBorn(
+    [...new Set([...liveChildren, ...storeChildren])].filter(id => store.people[id])
+  );
 
   // grandchildren grouped per child: [[gkids of child0], [gkids of child1], ...]
-  const gkidGroups = children.map(cid => sortIdsByBorn(store.childrenOf[cid]||[]));
+  // Build live from parentsOf to avoid stale childrenOf entries in slaktdata.json.
+  // A person is a grandchild of rootId if one of their parents is a child of rootId.
+  const childSet = new Set(children);
+  const gkidGroups = children.map(cid => {
+    // All people who have cid as a parent
+    const live = Object.keys(store.parentsOf)
+      .filter(pid => (store.parentsOf[pid]||[]).includes(cid));
+    // Also include what's already in childrenOf (in case parentsOf is incomplete)
+    const fromStore = store.childrenOf[cid] || [];
+    const merged = [...new Set([...live, ...fromStore])]
+      .filter(id => store.people[id]);
+    return sortIdsByBorn(merged);
+  });
 
   // grandparents: [gp of father (2 slots)], [gp of mother (2 slots)]
   const fatherGP = fatherId ? (store.parentsOf[fatherId]||[]).slice(0,2) : [];
