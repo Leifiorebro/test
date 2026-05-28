@@ -795,63 +795,88 @@ function drawGenealogy(rootId){
   // Row 1 (parents): father left, mother right of rootCX
   // Row i: spread pairs evenly under their child in row i-1
 
-  const rowCXs = []; // rowCXs[i] = array of cx values for ancestorRows[i]
-  rowCXs[0] = [rootCX];
+  // ── Assign CX top-down ──────────────────────────────────────────────────
+  // The topmost row (oldest generation) is spread evenly across the full
+  // canvas width. Each lower row's node sits at the midpoint of its two
+  // children in the row below. This guarantees NO overlap at any level.
+  const topRow    = ancestorRows[ancestorRows.length - 1];
+  const topCount  = topRow.length;  // max 2^GEN_UP slots
 
-  for(let i = 1; i < ancestorRows.length; i++){
-    const row    = ancestorRows[i];
-    const prevCXs = rowCXs[i-1];
-    const cxs = [];
-    // Each pair of nodes in this row corresponds to one node in prev row
-    for(let j = 0; j < row.length; j += 2){
-      const parentCX = prevCXs[Math.floor(j/2)] || midX;
-      // Spread the pair symmetrically around the parent
-      const spread = slotW * Math.pow(1.05, i - 1); // slight extra spread for deeper gens
-      cxs.push(parentCX - spread/2);
-      cxs.push(parentCX + spread/2);
-    }
-    rowCXs[i] = cxs;
+  // Use compact card width for gen>=3, full cardW for gen 1-2
+  function nodeW(genIdx){ return genIdx >= 3 ? compactW : cardW; }
+  function nodeGap(genIdx){ return genIdx >= 3 ? childGap : xPad; }
+  function nodeSlot(genIdx){ return nodeW(genIdx) + nodeGap(genIdx); }
+
+  // Top row total width — each slot must be at least nodeSlot(topGenIdx) wide
+  const topGenIdx  = ancestorRows.length - 1;
+  const topSlot    = Math.max(nodeSlot(topGenIdx), slotW); // at least slotW
+  const topTotalW  = topCount * topSlot;
+
+  // Make sure canvas is wide enough for the top row
+  const finalCanvasW = Math.max(canvasW, topTotalW + xPad * 2);
+  const finalMidX    = finalCanvasW / 2;
+
+  // Spread top row evenly centred on finalMidX
+  const rowCXs = [];
+  const topStart = finalMidX - topTotalW / 2 + topSlot / 2;
+  rowCXs[topGenIdx] = topRow.map((_, j) => topStart + j * topSlot);
+
+  // For each lower row, derive cx as midpoint of its two parent slots above
+  for(let i = topGenIdx - 1; i >= 0; i--){
+    const parentCXs = rowCXs[i + 1];
+    rowCXs[i] = ancestorRows[i].map((_, j) => {
+      const leftParentCX  = parentCXs[j * 2]     ?? finalMidX;
+      const rightParentCX = parentCXs[j * 2 + 1] ?? leftParentCX;
+      return (leftParentCX + rightParentCX) / 2;
+    });
   }
+
+  // Re-centre root at finalMidX (may drift slightly due to rounding)
+  const rootCXfinal = rowCXs[0][0];
+  const drift = finalMidX - rootCXfinal;
+  rowCXs.forEach(row => row.forEach((_, j) => row[j] += drift));
 
   // Draw ancestor rows from top (oldest) to bottom (parents)
   for(let i = ancestorRows.length - 1; i >= 1; i--){
-    const row = ancestorRows[i];
-    const y   = ancestorY[i];
-    const childY_row = ancestorY[i-1];
-    const useCompact = i >= 3; // use compact cards for great-grandparents and above
+    const row        = ancestorRows[i];
+    const y          = ancestorY[i];
+    const childY_row = ancestorY[i - 1];
+    const useCompact = i >= 3;
+    const nw         = useCompact ? compactW : cardW;
 
     row.forEach((node, j) => {
       if(!node.id) return;
       const cx = rowCXs[i][j];
-      const x  = useCompact ? cx - compactW/2 : cx2x(cx);
+      const x  = cx - nw / 2;
       if(useCompact) drawNodeCompact(g, x, y, node.id, "child");
-      else drawNode(g, x, y, node.id);
+      else           drawNode(g, x, y, node.id);
 
-      // Line to child in row below
+      // Line from this node down to its child
       const childIdx = Math.floor(j / 2);
-      const childCX  = rowCXs[i-1][childIdx] || rootCX;
-      drawCurve(g, cx, y + (useCompact ? cardH : cardH), childCX, childY_row);
+      const childCX  = rowCXs[i - 1][childIdx] ?? rowCXs[0][0];
+      drawCurve(g, cx, y + cardH, childCX, childY_row);
     });
 
-    // Draw spouse lines between pairs
+    // Spouse lines between pairs in this row
     for(let j = 0; j < row.length - 1; j += 2){
-      if(row[j]?.id && row[j+1]?.id){
+      if(row[j]?.id && row[j + 1]?.id){
         const cx1 = rowCXs[i][j];
-        const cx2 = rowCXs[i][j+1];
-        const midY = ancestorY[i] + cardH * 0.7;
-        drawCurve(g, cx1, midY, cx2, midY, true);
+        const cx2 = rowCXs[i][j + 1];
+        drawCurve(g, cx1, ancestorY[i] + cardH * 0.7, cx2, ancestorY[i] + cardH * 0.7, true);
       }
     }
   }
 
-  // Draw root
-  drawNode(g, cx2x(rootCX), rootY, rootId);
+  // Draw root (use adjusted centre from rowCXs[0][0] after drift correction)
+  const adjRootCX = rowCXs[0][0];
+  drawNode(g, adjRootCX - cardW/2, rootY, rootId);
 
   // Draw spouses
+  const adjSpouseCXs = spouseIds.map((_, i) => adjRootCX + (i + 1) * slotW);
   spouseIds.forEach((sid, i) => {
-    const scx = spouseCXs[i];
-    drawNode(g, cx2x(scx), rootY, sid);
-    const prevCX = i === 0 ? rootCX : spouseCXs[i-1];
+    const scx = adjSpouseCXs[i];
+    drawNode(g, scx - cardW/2, rootY, sid);
+    const prevCX = i === 0 ? adjRootCX : adjSpouseCXs[i-1];
     drawCurve(g, prevCX, rootY + cardH/2, scx, rootY + cardH/2, true);
   });
 
@@ -862,14 +887,17 @@ function drawGenealogy(rootId){
     const lastSpouseCX = spouseCXs.length > 0 ? spouseCXs[spouseCXs.length-1] : null;
     const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
 
-    // Spread children horizontally
-    let cursor = childAnchorCX - (children.length * childSlotW) / 2;
+    // Spread children horizontally centred under root (drift-adjusted)
+    const adjChildAnchorCX = adjSpouseCXs.length > 0
+      ? (adjRootCX + adjSpouseCXs[adjSpouseCXs.length-1]) / 2
+      : adjRootCX;
+    let cursor = adjChildAnchorCX - (children.length * childSlotW) / 2;
     const childCXs = children.map(() => { const cx = cursor + childSlotW/2; cursor += childSlotW; return cx; });
 
     children.forEach((cid, ci) => {
       const ccx = childCXs[ci];
       drawNodeCompact(g, ccx - compactW/2, childY, cid, "child");
-      drawCurve(g, childAnchorCX, rootY + cardH, ccx, childY);
+      drawCurve(g, adjChildAnchorCX, rootY + cardH, ccx, childY);
 
       // Draw further descendant generations vertically under each child
       let prevY = childY;
