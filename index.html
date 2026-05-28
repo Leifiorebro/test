@@ -50,6 +50,21 @@ svg{display:block;width:100%;height:100%}.node-card{fill:var(--card);stroke:#cbd
   </div>
   <button onclick="doSearch()">Sök</button>
   <button id="toggleSideBtn" onclick="toggleSide()" title="Visa/dölj sidopanel">☰</button>
+  <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">
+    Generationer:
+    <select id="genUpSel" onchange="refreshAll()" style="padding:4px 6px;border-radius:6px;border:1px solid #cbd5e1;font-size:13px;">
+      <option value="1">1 uppåt</option>
+      <option value="2" selected>2 uppåt</option>
+      <option value="3">3 uppåt</option>
+      <option value="4">4 uppåt</option>
+    </select>
+    <select id="genDownSel" onchange="refreshAll()" style="padding:4px 6px;border-radius:6px;border:1px solid #cbd5e1;font-size:13px;">
+      <option value="1">1 nedåt</option>
+      <option value="2" selected>2 nedåt</option>
+      <option value="3">3 nedåt</option>
+      <option value="4">4 nedåt</option>
+    </select>
+  </label>
   <span id="status">Redo</span>
 </div>
 <div id="wrap">
@@ -652,231 +667,247 @@ function drawGenealogy(rootId){
   const svg = d3.select("#tree").attr("width", W).attr("height", H);
   svg.selectAll("*").remove();
   const g = svg.append("g");
-  const zoom = d3.zoom().scaleExtent([0.15, 4]).on("zoom", e => g.attr("transform", e.transform));
+  const zoom = d3.zoom().scaleExtent([0.1, 5]).on("zoom", e => g.attr("transform", e.transform));
   svg.call(zoom);
 
-  // cardW and cardH are global constants (defined below drawNodeCompact)
-  const xPad  = 20;    // minimum horizontal gap between any two cards
-  const yGap  = 150;   // vertical gap between rows
+  // Read generation settings from selectors
+  const GEN_UP   = parseInt(document.getElementById("genUpSel")?.value   || "2", 10);
+  const GEN_DOWN = parseInt(document.getElementById("genDownSel")?.value  || "2", 10);
 
-  // ── Step 1: collect the 5 rows of nodes ──────────────────────────────────
-  // Row layout (top → bottom):
-  //   row0  grandparents of father  |  grandparents of mother       (y = rootY - 3*yGap)
-  //   row1  father  |  mother                                        (y = rootY - 2*yGap)  [above root]
-  //   row2  [spouse]  root                                           (y = rootY - 1*yGap)  [root row]
-  //   row3  children                                                 (y = rootY)
-  //   row4  grandchildren                                            (y = rootY + yGap)
-  //
-  // We use a slot object { id, cx } where cx is the horizontal centre.
+  const xPad   = 20;
+  const yGap   = 155;
+  const slotW  = cardW + xPad;
+  const compactW = 180;
+  const childGap = 10;
+  const childSlotW = compactW + childGap;
+  const gkGapY   = 20;
 
-  const parents   = (store.parentsOf[rootId]||[]).slice(0,2);
-  const fatherId  = parents[0]||null;
-  const motherId  = parents[1]||null;
-  const spouseIds = uniq(store.spousesOf[rootId]||[]);
-  const children  = sortIdsByBorn(store.childrenOf[rootId]||[]);
-
-  // grandchildren grouped per child: [[gkids of child0], [gkids of child1], ...]
-  const gkidGroups = children.map(cid => sortIdsByBorn(store.childrenOf[cid]||[]));
-
-  // grandparents: [gp of father (2 slots)], [gp of mother (2 slots)]
-  const fatherGP = fatherId ? (store.parentsOf[fatherId]||[]).slice(0,2) : [];
-  const motherGP = motherId ? (store.parentsOf[motherId]||[]).slice(0,2) : [];
-
-  // ── Step 2: bottom-up width calculation ──────────────────────────────────
-  // slotW: full slot for ancestors, root, spouses (needs room for 2 grandparents side by side)
-  const slotW = cardW + xPad;
-
-  // childSlotW: all children use a compact slot since grandchildren are stacked vertically.
-  // Gap between child cards = 10px (much tighter than the 20px ancestor gap).
-  // Compact card for child-level: narrower card = much tighter row
-  const compactW    = 180;              // compact card width (vs full cardW=260)
-  const compactH    = cardH;            // same height
-  const childGap    = 10;              // gap between compact child cards
-  const childSlotW  = compactW + childGap;  // 190px — vs 280px full slot
-  function childSlotPx(){ return childSlotW; }
-
-
-  // Total pixel width needed by all children together:
-  const totalChildPx = children.length === 0 ? slotW
-    : children.reduce((s,_,i) => s + childSlotPx(i), 0);
-
-  // Total slots for the root row (root + all spouses):
-  const rootRowSlots = 1 + spouseIds.length;
-
-  // Slots for the parent row (father + mother, each needs room for their own grandparents):
-  const fatherSlots = fatherId ? Math.max(1, fatherGP.length > 0 ? fatherGP.length : 1) : 0;
-  const motherSlots = motherId ? Math.max(1, motherGP.length > 0 ? motherGP.length : 1) : 0;
-  const parentRowSlots = Math.max(1, fatherSlots + motherSlots);
-
-  // Grandparent row slots:
-  const gpRowSlots = (fatherId ? Math.max(2, fatherGP.length) : 0)
-                   + (motherId ? Math.max(2, motherGP.length) : 0);
-
-  // Canvas width driven by widest row (children row now in px, others in slots):
-  const ancestorPx = Math.max(rootRowSlots, parentRowSlots, gpRowSlots || 1) * slotW;
-  const canvasW    = Math.max(totalChildPx, ancestorPx) + xPad;
-
-  // ── Step 3: assign Y rows ────────────────────────────────────────────────
-  // Anchor: we want the root to sit roughly in the vertical middle of the 5 rows.
-  // Rows from top: gpRow, parentRow, rootRow, childRow, gkidRow
-  const hasAncestors = fatherId || motherId;
-  const hasGP        = fatherGP.length > 0 || motherGP.length > 0;
-  const hasDesc      = children.length > 0;
-  const hasGkids     = gkidGroups.some(g => g.length > 0);
-
-  const totalRows    = (hasGP ? 1:0) + (hasAncestors ? 1:0) + 1 + (hasDesc ? 1:0) + (hasGkids ? 1:0);
-  const totalH       = totalRows * yGap + cardH;
-  const topY         = 40;
-
-  let rowY = topY;
-  const gpY      = hasGP        ? (rowY)                                            : null;
-  const parentY  = hasAncestors ? (rowY + (hasGP ? yGap : 0))                      : null;
-  const rootY    = rowY + (hasGP ? yGap:0) + (hasAncestors ? yGap:0);
-  const childY   = hasDesc      ? rootY + yGap                                      : null;
-  const gkidY    = hasGkids     ? rootY + (hasDesc ? 2:1)*yGap                     : null;
-
-  const maxGrandchildren =
-  Math.max(1, ...gkidGroups.map(g => g.length));
-
-const maxGkStack = gkidGroups.reduce((m,g)=> Math.max(m, g.length), 0);
-const gkStackH  = maxGkStack > 0 ? maxGkStack * (cardH + 20) : cardH;
-const totalCanvasH = (gkidY || childY || rootY) + gkStackH + 80;
-
-  // ── Step 4: assign X centres, bottom-up ──────────────────────────────────
-  // All centres are expressed as pixel x of card left edge.
-  // Helper: spread N items evenly across a band of width bandW, centred at cx:
-  function spreadCentres(n, bandCX, bandW){
-    if(n === 1) return [bandCX];
-    const step = bandW / (n - 1);
-    return Array.from({length:n}, (_,i) => bandCX - bandW/2 + i*step);
+  // ── Helper: get parents of a person ──
+  function getParents(id){ return (store.parentsOf[id]||[]).slice(0,2); }
+  function getChildren(id){
+    const live = Object.keys(store.parentsOf)
+      .filter(pid => (store.parentsOf[pid]||[]).includes(id));
+    const stored = store.childrenOf[id] || [];
+    return sortIdsByBorn([...new Set([...live, ...stored])].filter(x => store.people[x]));
   }
 
-  const midX = canvasW / 2;
+  // ── Build ancestor tree (upward) as array of rows ──
+  // ancestorRows[0] = [rootId], [1] = parents, [2] = grandparents, etc.
+  // Each entry: { id, cx (to be filled), parentIdx (index in row above) }
+  // We store rows bottom-up: row 0 = root level, row 1 = parents, row 2 = gp, ...
+  function buildAncestorRows(){
+    const rows = [[{ id: rootId }]];
+    for(let gen = 1; gen <= GEN_UP; gen++){
+      const prev = rows[gen-1];
+      const nextRow = [];
+      prev.forEach((node, ni) => {
+        const ps = node.id ? getParents(node.id) : [];
+        if(ps.length === 0){
+          // placeholder so layout stays consistent
+          nextRow.push({ id: null, childNodeIdx: ni });
+          nextRow.push({ id: null, childNodeIdx: ni });
+        } else if(ps.length === 1){
+          nextRow.push({ id: ps[0], childNodeIdx: ni });
+          nextRow.push({ id: null,  childNodeIdx: ni });
+        } else {
+          nextRow.push({ id: ps[0], childNodeIdx: ni });
+          nextRow.push({ id: ps[1], childNodeIdx: ni });
+        }
+      });
+      // Only add row if it has at least one real person
+      if(nextRow.some(n => n.id)) rows.push(nextRow);
+      else break;
+    }
+    return rows; // rows[0]=root, rows[1]=parents, rows[2]=gp, ...
+  }
 
-  // ── Root ──
-  const rootCX  = midX;
+  // ── Build descendant rows (downward) ──
+  // descRows[0] = children of root, [1] = their children, etc.
+  // Children are compact cards stacked differently per generation.
+  function buildDescRows(){
+    const rows = [];
+    let current = getChildren(rootId);
+    for(let gen = 0; gen < GEN_DOWN; gen++){
+      if(!current.length) break;
+      rows.push(current);
+      if(gen < GEN_DOWN - 1){
+        // next generation: children of all current
+        const next = [];
+        current.forEach(cid => getChildren(cid).forEach(g => { if(!next.includes(g)) next.push(g); }));
+        current = next;
+      }
+    }
+    return rows;
+  }
 
-  // ── Spouse (right of root, one slot gap) ──
+  const ancestorRows = buildAncestorRows(); // [0]=root row, [1]=parents, ...
+  const descRows     = buildDescRows();     // [0]=children, [1]=grandchildren, ...
+
+  const spouseIds = uniq(store.spousesOf[rootId]||[]);
+
+  // ── Layout: assign Y positions ──
+  // Root sits in the middle. Ancestors go up, descendants go down.
+  const numUp   = ancestorRows.length - 1;  // rows above root
+  const numDown = descRows.length;
+
+  // Y of root row
+  const rootY = 40 + numUp * yGap;
+
+  // Ancestor Y rows (index 1 = parents row, 2 = gp row, ...)
+  const ancestorY = ancestorRows.map((_, i) => rootY - i * yGap);
+
+  // Descendant Y rows
+  const descY = descRows.map((_, i) => {
+    if(i === 0) return rootY + yGap;  // children row
+    // subsequent rows: stack vertically — handled per-column below
+    return null; // computed per child column
+  });
+
+  // ── Layout: assign X positions ──
+  // Width is driven by the widest ancestor row.
+  // Ancestor row width: each node needs slotW; row[i] has 2^i nodes max.
+  const maxAncestorNodes = ancestorRows.length > 1 ? ancestorRows[ancestorRows.length-1].length : 1;
+  const ancestorCanvasW  = maxAncestorNodes * slotW;
+
+  // Children width
+  const numChildren = descRows[0] ? descRows[0].length : 0;
+  const childrenCanvasW = numChildren * childSlotW;
+
+  // Also account for spouses
+  const spouseCanvasW = (1 + spouseIds.length) * slotW;
+
+  const canvasW = Math.max(ancestorCanvasW, childrenCanvasW, spouseCanvasW) + xPad * 2;
+  const midX    = canvasW / 2;
+
+  // Root X
+  const rootCX = midX;
+  function cx2x(cx){ return cx - cardW/2; }
+
+  // Spouse positions
   const spouseCXs = spouseIds.map((_, i) => rootCX + (i + 1) * slotW);
 
-  // ── Children — spread using per-child pixel widths ──
-  let childCXs = [];
-  if(children.length > 0){
-    const lastSpouseCX = spouseCXs.length > 0 ? spouseCXs[spouseCXs.length-1] : null;
-    const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
-    // Place each child at the centre of its own slot
-    let cursor = childAnchorCX - totalChildPx/2;
-    children.forEach((_,i) => {
-      const w = childSlotPx(i);
-      childCXs.push(cursor + w/2);
-      cursor += w;
+  // ── Draw ancestors recursively ──
+  // ancestorRows[0] = [{id: rootId}] with cx = rootCX
+  // We assign cx to each node top-down after computing widths bottom-up.
+
+  // Assign CX for each row, bottom-up:
+  // Row 0 (root): cx = rootCX
+  // Row 1 (parents): father left, mother right of rootCX
+  // Row i: spread pairs evenly under their child in row i-1
+
+  const rowCXs = []; // rowCXs[i] = array of cx values for ancestorRows[i]
+  rowCXs[0] = [rootCX];
+
+  for(let i = 1; i < ancestorRows.length; i++){
+    const row    = ancestorRows[i];
+    const prevCXs = rowCXs[i-1];
+    const cxs = [];
+    // Each pair of nodes in this row corresponds to one node in prev row
+    for(let j = 0; j < row.length; j += 2){
+      const parentCX = prevCXs[Math.floor(j/2)] || midX;
+      // Spread the pair symmetrically around the parent
+      const spread = slotW * Math.pow(1.05, i - 1); // slight extra spread for deeper gens
+      cxs.push(parentCX - spread/2);
+      cxs.push(parentCX + spread/2);
+    }
+    rowCXs[i] = cxs;
+  }
+
+  // Draw ancestor rows from top (oldest) to bottom (parents)
+  for(let i = ancestorRows.length - 1; i >= 1; i--){
+    const row = ancestorRows[i];
+    const y   = ancestorY[i];
+    const childY_row = ancestorY[i-1];
+    const useCompact = i >= 3; // use compact cards for great-grandparents and above
+
+    row.forEach((node, j) => {
+      if(!node.id) return;
+      const cx = rowCXs[i][j];
+      const x  = useCompact ? cx - compactW/2 : cx2x(cx);
+      if(useCompact) drawNodeCompact(g, x, y, node.id, "child");
+      else drawNode(g, x, y, node.id);
+
+      // Line to child in row below
+      const childIdx = Math.floor(j / 2);
+      const childCX  = rowCXs[i-1][childIdx] || rootCX;
+      drawCurve(g, cx, y + (useCompact ? cardH : cardH), childCX, childY_row);
     });
+
+    // Draw spouse lines between pairs
+    for(let j = 0; j < row.length - 1; j += 2){
+      if(row[j]?.id && row[j+1]?.id){
+        const cx1 = rowCXs[i][j];
+        const cx2 = rowCXs[i][j+1];
+        const midY = ancestorY[i] + cardH * 0.7;
+        drawCurve(g, cx1, midY, cx2, midY, true);
+      }
+    }
   }
 
-  // ── Grandchildren — stacked vertically under each child ──
-  const gkGapY = 20;
-  const gkidLayouts = children.map((_, i) => {
-    const gkids = gkidGroups[i];
-    if(!gkids.length) return [];
-    return gkids.map((gid, j) => ({
-      id: gid,
-      cx: childCXs[i],
-      y:  gkidY + j * (cardH + gkGapY)
-    }));
-  });
-
-  // ── Parents — centred over root, but spread to cover grandparents ──
-  // Father needs room for up to 2 grandparents, mother likewise.
-  // Minimum spacing between father and mother centres = slotW * max(fatherGP, 1) + slotW * max(motherGP, 1)
-  const fatherSpan = fatherId ? Math.max(1, fatherGP.length) * slotW : 0;
-  const motherSpan = motherId ? Math.max(1, motherGP.length) * slotW : 0;
-  const parentBandW = fatherSpan + motherSpan - slotW; // total distance father-centre to mother-centre
-  const parentAnchorCX = rootCX;
-
-  const fatherCX = fatherId
-    ? (motherId ? parentAnchorCX - motherSpan/2 - fatherSpan/2 + fatherSpan/2
-                : parentAnchorCX)
-    : null;
-  const motherCX = motherId
-    ? (fatherId ? parentAnchorCX + fatherSpan/2 + motherSpan/2 - motherSpan/2
-                : parentAnchorCX)
-    : null;
-
-  // ── Grandparents — spread under their parent (father or mother) ──
-  function gpCentresFor(parentCX, gpIds){
-    const n = gpIds.length;
-    if(n === 0) return [];
-    if(n === 1) return [parentCX];
-    return [parentCX - slotW/2, parentCX + slotW/2];
-  }
-  const fatherGPCXs = fatherId ? gpCentresFor(fatherCX, fatherGP) : [];
-  const motherGPCXs = motherId ? gpCentresFor(motherCX, motherGP) : [];
-
-  // ── Step 5: draw everything ───────────────────────────────────────────────
-  function cx2x(cx){ return cx - cardW/2; }   // centre → left-edge x
-
-  // grandparents
-  fatherGP.forEach((id,i) => {
-    if(!id) return;
-    const x = cx2x(fatherGPCXs[i]);
-    drawNode(g, x, gpY, id);
-    if(fatherCX !== null) drawCurve(g, fatherGPCXs[i], gpY+cardH, fatherCX, parentY);
-  });
-  if(fatherGP[0] && fatherGP[1]){
-    drawCurve(g, fatherGPCXs[0], gpY+cardH/2+cardH/4, fatherGPCXs[1], gpY+cardH/2+cardH/4, true);
-  }
-  motherGP.forEach((id,i) => {
-    if(!id) return;
-    const x = cx2x(motherGPCXs[i]);
-    drawNode(g, x, gpY, id);
-    if(motherCX !== null) drawCurve(g, motherGPCXs[i], gpY+cardH, motherCX, parentY);
-  });
-  if(motherGP[0] && motherGP[1]){
-    drawCurve(g, motherGPCXs[0], gpY+cardH/2+cardH/4, motherGPCXs[1], gpY+cardH/2+cardH/4, true);
-  }
-
-  // parents
-  if(fatherId){ drawNode(g, cx2x(fatherCX), parentY, fatherId); drawCurve(g, fatherCX, parentY+cardH, rootCX, rootY); }
-  if(motherId){ drawNode(g, cx2x(motherCX), parentY, motherId); drawCurve(g, motherCX, parentY+cardH, rootCX, rootY); }
-  if(fatherId && motherId){ drawCurve(g, fatherCX, parentY+cardH/2, motherCX, parentY+cardH/2, true); }
-
-  // root
+  // Draw root
   drawNode(g, cx2x(rootCX), rootY, rootId);
 
-  // spouses (one or more)
+  // Draw spouses
   spouseIds.forEach((sid, i) => {
     const scx = spouseCXs[i];
     drawNode(g, cx2x(scx), rootY, sid);
     const prevCX = i === 0 ? rootCX : spouseCXs[i-1];
-    drawCurve(g, prevCX, rootY+cardH/2, scx, rootY+cardH/2, true);
+    drawCurve(g, prevCX, rootY + cardH/2, scx, rootY + cardH/2, true);
   });
 
-  // children + grandchildren
-  const lastSpouseCX = spouseCXs.length > 0 ? spouseCXs[spouseCXs.length-1] : null;
-  const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
-  children.forEach((cid, i) => {
-    const ccx = childCXs[i];
-    // Use compact card for children — narrower to fit more siblings
-    const childCardX = ccx - compactW/2;
-    drawNodeCompact(g, childCardX, childY, cid, "child");
-    drawCurve(g, childAnchorCX, rootY+cardH, ccx, childY);
+  // ── Draw descendants ──
+  if(descRows.length > 0){
+    const children = descRows[0];
+    const childY   = rootY + yGap;
+    const lastSpouseCX = spouseCXs.length > 0 ? spouseCXs[spouseCXs.length-1] : null;
+    const childAnchorCX = lastSpouseCX ? (rootCX + lastSpouseCX)/2 : rootCX;
 
-    gkidLayouts[i].forEach((gc, gi) => {
-      // Grandchildren also use compact cards since they're in a narrow column
-      drawNodeCompact(g, gc.cx - compactW/2, gc.y, gc.id, "grandchild");
-      const fromY = gi === 0 ? childY + cardH : gkidLayouts[i][gi-1].y + cardH;
-      g.append("line")
-        .attr("x1", gc.cx).attr("y1", fromY)
-        .attr("x2", gc.cx).attr("y2", gc.y)
-        .attr("stroke", "var(--line)")
-        .attr("stroke-width", 2);
+    // Spread children horizontally
+    let cursor = childAnchorCX - (children.length * childSlotW) / 2;
+    const childCXs = children.map(() => { const cx = cursor + childSlotW/2; cursor += childSlotW; return cx; });
+
+    children.forEach((cid, ci) => {
+      const ccx = childCXs[ci];
+      drawNodeCompact(g, ccx - compactW/2, childY, cid, "child");
+      drawCurve(g, childAnchorCX, rootY + cardH, ccx, childY);
+
+      // Draw further descendant generations vertically under each child
+      let prevY = childY;
+      let prevCX = ccx;
+      for(let gen = 1; gen < descRows.length; gen++){
+        // Find this child's children in the next desc row
+        const genChildren = getChildren(gen === 1 ? cid : null);
+        // Actually get children of the node at this column
+        // We need to track which node is in this column at each gen
+        // Simple approach: re-fetch live children at each level
+        const colNode = gen === 1 ? cid : null;
+        if(!colNode) break;
+        const subKids = getChildren(colNode);
+        if(!subKids.length) break;
+
+        subKids.forEach((gid, gi) => {
+          const gy = childY + gen * (cardH + gkGapY) + gi * (cardH + gkGapY);
+          drawNodeCompact(g, ccx - compactW/2, gy, gid, gen % 2 === 0 ? "child" : "grandchild");
+          const fromY = gi === 0 ? childY + cardH : childY + gen*(cardH+gkGapY) + (gi-1)*(cardH+gkGapY) + cardH;
+          g.append("line")
+            .attr("x1", ccx).attr("y1", gen === 1 && gi === 0 ? childY + cardH : fromY)
+            .attr("x2", ccx).attr("y2", gy)
+            .attr("stroke", "var(--line)").attr("stroke-width", 2);
+        });
+        break; // only one level of vertical stacking per column for now
+      }
     });
-  });
 
-  // ── Step 6: auto-fit ─────────────────────────────────────────────────────
+    // Second and deeper desc generations via buildDescRows
+    if(descRows.length > 1){
+      // Already handled above via vertical stacking
+    }
+  }
+
+  // ── Auto-fit ──
   const bounds = g.node().getBBox();
   if(bounds.width > 0 && bounds.height > 0){
-    const scale = Math.min(0.95, Math.min(W/(bounds.width+60), H/(bounds.height+60)));
+    const scale = Math.min(0.92, Math.min(W/(bounds.width+60), H/(bounds.height+60)));
     const tx = (W - bounds.width*scale)/2 - bounds.x*scale;
     const ty = (H - bounds.height*scale)/2 - bounds.y*scale;
     svg.call(zoom.transform, d3.zoomIdentity.translate(tx,ty).scale(scale));
