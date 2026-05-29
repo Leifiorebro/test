@@ -894,42 +894,54 @@ function drawGenealogy(rootId){
     let cursor = adjChildAnchorCX - (children.length * childSlotW) / 2;
     const childCXs = children.map(() => { const cx = cursor + childSlotW/2; cursor += childSlotW; return cx; });
 
+    // Level colors: alternating blue/green per generation depth
+    const levelColors = ["child","grandchild","child","grandchild"];
+
+    // Recursive function: draw a node and all its descendants vertically
+    // parentId  = the person whose descendants to draw
+    // cx        = horizontal centre for this column
+    // startY    = Y of the top of the first descendant card
+    // genDepth  = how many more generations to draw (counts down)
+    // genIndex  = visual depth index for color selection
+    // Returns   = the Y bottom of the last card drawn in this column
+    function drawDescColumn(parentId, cx, startY, genDepth, genIndex){
+      if(genDepth <= 0) return startY;
+      const kids = getChildren(parentId);
+      if(!kids.length) return startY;
+
+      let currentY = startY;
+      kids.forEach((kid, ki) => {
+        const color = levelColors[genIndex % levelColors.length];
+        drawNodeCompact(g, cx - compactW/2, currentY, kid, color);
+
+        // Vertical line from previous card bottom (or parent bottom) to this card top
+        const lineFromY = ki === 0 ? startY - gkGapY : currentY - gkGapY;
+        g.append("line")
+          .attr("x1", cx).attr("y1", lineFromY)
+          .attr("x2", cx).attr("y2", currentY)
+          .attr("stroke","var(--line)").attr("stroke-width", 2);
+
+        currentY += cardH;
+
+        // Recurse: draw this kid's descendants below
+        currentY = drawDescColumn(kid, cx, currentY + gkGapY, genDepth - 1, genIndex + 1);
+      });
+      return currentY;
+    }
+
     children.forEach((cid, ci) => {
       const ccx = childCXs[ci];
+
+      // Draw the child card (generation 1 below root)
       drawNodeCompact(g, ccx - compactW/2, childY, cid, "child");
       drawCurve(g, adjChildAnchorCX, rootY + cardH, ccx, childY);
 
-      // Draw further descendant generations vertically under each child
-      let prevY = childY;
-      let prevCX = ccx;
-      for(let gen = 1; gen < descRows.length; gen++){
-        // Find this child's children in the next desc row
-        const genChildren = getChildren(gen === 1 ? cid : null);
-        // Actually get children of the node at this column
-        // We need to track which node is in this column at each gen
-        // Simple approach: re-fetch live children at each level
-        const colNode = gen === 1 ? cid : null;
-        if(!colNode) break;
-        const subKids = getChildren(colNode);
-        if(!subKids.length) break;
-
-        subKids.forEach((gid, gi) => {
-          const gy = childY + gen * (cardH + gkGapY) + gi * (cardH + gkGapY);
-          drawNodeCompact(g, ccx - compactW/2, gy, gid, gen % 2 === 0 ? "child" : "grandchild");
-          const fromY = gi === 0 ? childY + cardH : childY + gen*(cardH+gkGapY) + (gi-1)*(cardH+gkGapY) + cardH;
-          g.append("line")
-            .attr("x1", ccx).attr("y1", gen === 1 && gi === 0 ? childY + cardH : fromY)
-            .attr("x2", ccx).attr("y2", gy)
-            .attr("stroke", "var(--line)").attr("stroke-width", 2);
-        });
-        break; // only one level of vertical stacking per column for now
+      // Draw all further descendant generations vertically below this child
+      // GEN_DOWN - 1 because generation 1 (child) is already drawn above
+      if(GEN_DOWN > 1){
+        drawDescColumn(cid, ccx, childY + cardH + gkGapY, GEN_DOWN - 1, 1);
       }
     });
-
-    // Second and deeper desc generations via buildDescRows
-    if(descRows.length > 1){
-      // Already handled above via vertical stacking
-    }
   }
 
   // ── Auto-fit ──
